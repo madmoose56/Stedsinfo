@@ -59,6 +59,10 @@ a{color:var(--accent)}
 footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .spin{color:var(--muted)}
 [hidden]{display:none!important}
+.kart-radius{background:#fff;color:#14532d;border:2px solid rgba(0,0,0,.3);border-radius:8px;
+  min-width:52px;height:36px;padding:0 10px;font:700 14px/1 -apple-system,BlinkMacSystemFont,sans-serif;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
+.kart-radius:active{background:#e8efe9}
 .toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .toggles label{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
   border-radius:10px;font-weight:600;font-size:15px}
@@ -83,7 +87,7 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
   <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
 
   <section class="card" id="c-kart">
-    <h2>Kart (3 km hver vei)</h2>
+    <h2>Kart</h2>
     <div class="toggles" id="kart-valg">
       <label><input type="checkbox" data-layer="eiendom"> Eiendomsgrenser</label>
       <label><input type="checkbox" data-layer="vern"> Verneområde</label>
@@ -92,7 +96,7 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
     <div class="warn" id="kart-hint" hidden>Eiendomsgrenser vises først når du zoomer litt inn.
       <button class="more" id="kart-zoom" type="button">Zoom inn</button></div>
-    <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplede ringer er 100 m og 1 km.</div>
+    <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplet ring viser radius 100 m.</div>
   </section>
 
   <footer>
@@ -343,7 +347,8 @@ async function loadKultur(lat, lon){
 }
 
 /* ---------- kart (Leaflet) ---------- */
-const KART_HALV = 3000; // meter i hver retning
+let kartRadius = 100; // meter: 100 eller 1000. Kartet starter på 100 m.
+let kartAcc = 0, kartBtn = null;
 const KART_LAG = {
   vern: {
     url: "https://kart.miljodirektoratet.no/arcgis/services/vern/MapServer/WMSServer",
@@ -406,23 +411,48 @@ function initMap(){
   });
   map.on("zoomend", updateKartHint);
   $("#kart-zoom").addEventListener("click", () => { if(kartPos) map.setView(kartPos, 14); });
+
+  // liten knapp øverst til høyre som bytter mellom 100 m og 1 km radius
+  const RadiusCtl = L.Control.extend({
+    options: {position: "topright"},
+    onAdd(){
+      const b = L.DomUtil.create("button", "kart-radius");
+      b.type = "button";
+      kartBtn = b;
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, "click", () => { kartRadius = kartRadius === 100 ? 1000 : 100; drawKart(); });
+      return b;
+    }
+  });
+  map.addControl(new RadiusCtl());
   return true;
+}
+function drawKart(){
+  if(!map || !kartPos) return;
+  const [lat, lon] = kartPos;
+  posLayers.forEach(l => l.remove());
+  posLayers = [];
+  posLayers.push(L.circle(kartPos, {radius: kartRadius, color: "#14532d", weight: 2, dashArray: "6 6", fill: false}));
+  if(kartAcc > 5) posLayers.push(L.circle(kartPos, {radius: kartAcc, color: "#2563eb", weight: 1, fillOpacity: 0.12}));
+  posLayers.push(L.circleMarker(kartPos, {radius: 7, color: "#ffffff", weight: 2.5, fillColor: "#2563eb", fillOpacity: 1}));
+  posLayers.forEach(l => l.addTo(map));
+  const dLat = kartRadius / 110540;
+  const dLon = kartRadius / (111320 * Math.cos(lat * Math.PI / 180));
+  map.invalidateSize();
+  map.fitBounds([[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]], {animate: false, padding: [10, 10]});
+  const neste = kartRadius === 100 ? "1 km" : "100 m";
+  if(kartBtn){
+    kartBtn.textContent = neste;
+    kartBtn.setAttribute("aria-label", "Vis radius " + neste);
+  }
+  $("#kart-info").textContent = "Blå prikk er posisjonen din. Stiplet ring viser radius " + (kartRadius === 100 ? "100 m" : "1 km") + ".";
+  updateKartHint();
 }
 function showKart(lat, lon, acc){
   if(!initMap()) return;
   kartPos = [lat, lon];
-  posLayers.forEach(l => l.remove());
-  posLayers = [];
-  const ring = r => L.circle(kartPos, {radius: r, color: "#14532d", weight: 1.5, dashArray: "5 5", fill: false});
-  posLayers.push(ring(100), ring(1000));
-  if(acc && acc > 5) posLayers.push(L.circle(kartPos, {radius: acc, color: "#2563eb", weight: 1, fillOpacity: 0.12}));
-  posLayers.push(L.circleMarker(kartPos, {radius: 7, color: "#ffffff", weight: 2.5, fillColor: "#2563eb", fillOpacity: 1}));
-  posLayers.forEach(l => l.addTo(map));
-  const dLat = KART_HALV / 110540;
-  const dLon = KART_HALV / (111320 * Math.cos(lat * Math.PI / 180));
-  map.invalidateSize();
-  map.fitBounds([[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]], {animate: false});
-  updateKartHint();
+  kartAcc = acc || 0;
+  drawKart();
 }
 
 /* ---------- hovedflyt ---------- */
