@@ -260,10 +260,11 @@ async function loadSted(lat, lon){
       ["Festenummer", a.festenummer || null],
       ["Matrikkel", matrikkel]
     ]);
-    e += `<div class="muted" style="margin-top:8px">Hentet fra nærmeste adressepunkt. Står du nær en eiendomsgrense, eller langt fra bebyggelse, kan faktisk teig avvike.</div>`;
+    e += `<div class="muted" style="margin-top:8px">Hentet fra nærmeste adressepunkt.</div>`;
   } else {
     e += `<div class="muted">Fant ikke gnr/bnr – ingen adresse nær nok.</div>`;
   }
+  e += `<div class="links" style="margin-top:8px"><a href="https://kartkatalog.geonorge.no/metadata/74340c24-1c8a-4454-b813-bfe498e80f16" target="_blank" rel="noopener">Matrikkel – eiendomskart Teig (GeoNorge)</a></div>`;
   setCard("eiendom", e);
 
   // Eier
