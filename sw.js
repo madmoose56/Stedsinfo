@@ -1,5 +1,5 @@
 // Cacher bare app-skallet. API-kall går alltid direkte mot nettet (ferske data).
-const CACHE = "stedsinfo-v5";
+const CACHE = "stedsinfo-v6";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

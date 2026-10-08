@@ -375,7 +375,7 @@ async function loadKultur(lat, lon){
 
 /* ---------- kart (Leaflet) ---------- */
 let kartRadius = 100; // meter: 100 eller 1000. Kartet starter på 100 m.
-let kartAcc = 0, kartBtn = null;
+let kartAcc = 0, kartBtn = null, kartFraAdresse = false;
 const KART_LAG = {
   vern: {
     url: "https://kart.miljodirektoratet.no/arcgis/services/vern/MapServer/WMSServer",
@@ -472,6 +472,7 @@ function drawKart(){
     kartBtn.textContent = neste;
     kartBtn.setAttribute("aria-label", "Vis radius " + neste);
   }
+  $("#kart-info").hidden = kartFraAdresse;
   $("#kart-info").textContent = "Blå prikk er posisjonen din. Stiplet ring viser radius " + (kartRadius === 100 ? "100 m" : "1 km") + ".";
   updateKartHint();
 }
@@ -486,7 +487,8 @@ function showKart(lat, lon, acc){
 function loading(){
   ["sted","eiendom","natur","kultur"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
 }
-async function runAll(lat, lon, acc){
+async function runAll(lat, lon, acc, fraAdresse){
+  kartFraAdresse = !!fraAdresse;
   $("#pos").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? ` · ±${Math.round(acc)} m` : "");
   loading();
   loadMobil();
@@ -539,7 +541,7 @@ function pickAdresse(a){
   const p = a.representasjonspunkt;
   if(!p) return;
   $("#adr-res").innerHTML = "";
-  runAll(p.lat, p.lon, 0);
+  runAll(p.lat, p.lon, 0, true);
   $("#pos").textContent = `${a.adressetekst}, ${a.postnummer} ${a.poststed}`;
 }
 async function sokAdresse(ev){
