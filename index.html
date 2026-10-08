@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<title>Stedsinfo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stedsinfo">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<style>
+:root{
+  --bg:#f4f5f2; --card:#ffffff; --text:#1c1f1a; --muted:#5f665b; --line:#e1e4dc;
+  --accent:#14532d; --accent-text:#ffffff; --warn:#8a5a00; --warn-bg:#fff4d6; --err:#a1261b;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#111411; --card:#1b201b; --text:#eceee9; --muted:#9aa395; --line:#2b322a;
+    --accent:#4ade80; --accent-text:#08210f; --warn:#f5c15a; --warn-bg:#3a2e10; --err:#ff8a7e; }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",Roboto,sans-serif;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+header{position:sticky;top:0;z-index:5;background:var(--accent);color:var(--accent-text);
+  padding:calc(env(safe-area-inset-top) * 0 + 12px) 16px 12px}
+header h1{margin:0;font-size:20px;font-weight:700}
+#pos{font-size:13px;opacity:.9;margin-top:2px;font-variant-numeric:tabular-nums}
+main{padding:12px 12px 40px;max-width:720px;margin:0 auto}
+button{font:inherit}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;background:var(--accent);
+  color:var(--accent-text);font-weight:600;margin:4px 0 12px}
+.btn:disabled{opacity:.6}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px}
+.card h2{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.big{font-size:20px;font-weight:700;line-height:1.25}
+.row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row span:first-child{color:var(--muted)}
+.row span:last-child{text-align:right;font-weight:600}
+.muted{color:var(--muted);font-size:14px}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:14px;margin:8px 0 0}
+.err{color:var(--err);font-size:14px}
+.tier{margin:12px 0 4px;font-weight:700;font-size:15px}
+.item{padding:8px 0;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.item .n{font-weight:600}
+.item .s{color:var(--muted);font-size:14px}
+.dist{float:right;font-variant-numeric:tabular-nums;font-weight:700;margin-left:10px}
+a{color:var(--accent)}
+.links a{display:inline-block;margin:4px 8px 4px 0;padding:8px 12px;border:1px solid var(--line);
+  border-radius:10px;text-decoration:none;font-weight:600}
+.more{background:none;border:0;color:var(--accent);font-weight:600;padding:8px 0}
+footer{color:var(--muted);font-size:12px;padding:8px 4px}
+.spin{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Stedsinfo</h1>
+  <div id="pos">Henter posisjon …</div>
+</header>
+<main>
+  <button class="btn" id="refresh">Oppdater posisjon</button>
+
+  <section class="card" id="c-sted"><h2>Sted</h2><div class="spin">Henter …</div></section>
+  <section class="card" id="c-eiendom"><h2>Eiendom</h2><div class="spin">Henter …</div></section>
+  <section class="card" id="c-eier"><h2>Eier</h2><div class="spin">…</div></section>
+  <section class="card" id="c-mobil"><h2>Mobildekning</h2><div class="spin">…</div></section>
+  <section class="card" id="c-natur"><h2>Natur og verneområder</h2><div class="spin">Henter …</div></section>
+  <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
+
+  <footer>
+    Kilder: Kartverket (adresser, kommuneinfo), Miljødirektoratet (Naturbase verneområder),
+    Riksantikvaren (Askeladden/Kulturminnesøk). Data er veiledende, ikke juridisk bindende.
+    Tips: legg til <code>#59.9139,10.7522</code> i adressen for å teste en annen posisjon.
+  </footer>
+</main>
+
+<script>
+"use strict";
+const API = {
+  adresse: "https://ws.geonorge.no/adresser/v1/punktsok",
+  kommune: "https://ws.geonorge.no/kommuneinfo/v1/punkt",
+  vern: "https://kart.miljodirektoratet.no/arcgis/rest/services/vern/MapServer/0/query",
+  kultur: "https://api.ra.no/LokaliteterEnkeltminnerOgSikringssoner/collections/lokaliteter/items"
+};
+const $ = s => document.querySelector(s);
+
+/* ---------- hjelpere ---------- */
+function esc(v){
+  return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function safeUrl(u){ return (typeof u === "string" && u.startsWith("https://")) ? u : null; }
+function fmtDist(d){ return d < 1000 ? Math.round(d) + " m" : (d / 1000).toFixed(1).replace(".", ",") + " km"; }
+function setCard(id, html){
+  const el = $("#c-" + id);
+  el.innerHTML = el.querySelector("h2").outerHTML + html;
+}
+function rows(pairs){
+  return pairs.filter(p => p[1] !== null && p[1] !== undefined && p[1] !== "")
+    .map(p => `<div class="row"><span>${esc(p[0])}</span><span>${esc(p[1])}</span></div>`).join("");
+}
+async function getJson(url){
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 20000);
+  try{
+    const r = await fetch(url, {signal: ctl.signal, headers: {"Accept": "application/json"}});
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+function errHtml(e){
+  return `<div class="err">Kunne ikke hente data (${esc(e.message || e)}). Sjekk nettforbindelsen og prøv igjen.</div>`;
+}
+
+/* ---------- geometri (lokal flat-jord-projeksjon, god nok for < 2 km) ---------- */
+function proj(lon, lat, lon0, lat0){
+  return [(lon - lon0) * Math.cos(lat0 * Math.PI / 180) * 111320, (lat - lat0) * 110540];
+}
+function segDist(ax, ay, bx, by){
+  const dx = bx - ax, dy = by - ay, l2 = dx*dx + dy*dy;
+  const t = l2 ? Math.max(0, Math.min(1, -(ax*dx + ay*dy) / l2)) : 0;
+  return Math.hypot(ax + t*dx, ay + t*dy);
+}
+function lineDist(coords, lon0, lat0){
+  const p = coords.map(c => proj(c[0], c[1], lon0, lat0));
+  if(p.length === 1) return Math.hypot(p[0][0], p[0][1]);
+  let m = Infinity;
+  for(let i = 0; i < p.length - 1; i++) m = Math.min(m, segDist(p[i][0], p[i][1], p[i+1][0], p[i+1][1]));
+  return m;
+}
+function inRing(coords, lon0, lat0){
+  const p = coords.map(c => proj(c[0], c[1], lon0, lat0));
+  let inside = false;
+  for(let i = 0, j = p.length - 1; i < p.length; j = i++){
+    const [xi, yi] = p[i], [xj, yj] = p[j];
+    if((yi > 0) !== (yj > 0) && 0 < (xj - xi) * (0 - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function polyDist(rings, lon0, lat0){
+  if(inRing(rings[0], lon0, lat0) && !rings.slice(1).some(r => inRing(r, lon0, lat0))) return 0;
+  return Math.min(...rings.map(r => lineDist(r, lon0, lat0)));
+}
+function geomDist(g, lat0, lon0){
+  if(!g) return Infinity;
+  switch(g.type){
+    case "Point": return lineDist([g.coordinates], lon0, lat0);
+    case "MultiPoint": return Math.min(...g.coordinates.map(c => lineDist([c], lon0, lat0)));
+    case "LineString": return lineDist(g.coordinates, lon0, lat0);
+    case "MultiLineString": return Math.min(...g.coordinates.map(l => lineDist(l, lon0, lat0)));
+    case "Polygon": return polyDist(g.coordinates, lon0, lat0);
+    case "MultiPolygon": return Math.min(...g.coordinates.map(p => polyDist(p, lon0, lat0)));
+    case "GeometryCollection": return Math.min(...g.geometries.map(x => geomDist(x, lat0, lon0)));
+    default: return Infinity;
+  }
+}
+
+/* ---------- Sted + Eiendom ---------- */
+async function loadSted(lat, lon){
+  const [kom, adr] = await Promise.allSettled([
+    getJson(`${API.kommune}?nord=${lat}&ost=${lon}&koordsys=4258`),
+    (async () => {
+      let d = await getJson(`${API.adresse}?lat=${lat}&lon=${lon}&radius=200&treffPerSide=5&asciiKompatibel=false`);
+      if(!d.adresser || !d.adresser.length)
+        d = await getJson(`${API.adresse}?lat=${lat}&lon=${lon}&radius=1000&treffPerSide=5&asciiKompatibel=false`);
+      return d;
+    })()
+  ]);
+
+  const k = kom.status === "fulfilled" ? kom.value : null;
+  const a = adr.status === "fulfilled" && adr.value.adresser && adr.value.adresser[0] ? adr.value.adresser[0] : null;
+
+  // Sted
+  let h = "";
+  if(a){
+    h += `<div class="big">${esc(a.adressetekst)}</div><div class="muted">${esc(a.postnummer)} ${esc(a.poststed)}</div>`;
+    if(a.meterDistanseTilPunkt > 50)
+      h += `<div class="warn">Nærmeste registrerte adresse er ${Math.round(a.meterDistanseTilPunkt)} m unna.</div>`;
+  } else if(adr.status === "rejected"){
+    h += errHtml(adr.reason);
+  } else {
+    h += `<div class="muted">Ingen registrert adresse i nærheten.</div>`;
+  }
+  h += rows([
+    ["Kommune", k ? `${k.kommunenavn} (${k.kommunenummer})` : (a ? a.kommunenavn : null)],
+    ["Fylke", k ? `${k.fylkesnavn} (${k.fylkesnummer})` : null]
+  ]);
+  if(kom.status === "rejected") h += `<div class="muted">Kommune/fylke: ${esc(kom.reason.message)} (utenfor Norge?)</div>`;
+  setCard("sted", h);
+
+  // Eiendom
+  let e = "";
+  let matrikkel = null;
+  if(a && a.gardsnummer != null){
+    const fe = a.festenummer ? `/${a.festenummer}` : "";
+    const komnr = a.kommunenummer || (k && k.kommunenummer) || "";
+    matrikkel = `${komnr}-${a.gardsnummer}/${a.bruksnummer}${fe}`;
+    e += rows([
+      ["Gårdsnummer (gnr)", a.gardsnummer],
+      ["Bruksnummer (bnr)", a.bruksnummer],
+      ["Festenummer", a.festenummer || null],
+      ["Matrikkel", matrikkel]
+    ]);
+    e += `<div class="muted" style="margin-top:8px">Hentet fra nærmeste adressepunkt. Står du nær en eiendomsgrense, eller langt fra bebyggelse, kan faktisk teig avvike.</div>`;
+  } else {
+    e += `<div class="muted">Fant ikke gnr/bnr – ingen adresse nær nok.</div>`;
+  }
+  setCard("eiendom", e);
+
+  // Eier
+  setCard("eier", `
+    <div class="muted">Eier av eiendommen er <b>ikke åpne data</b>. Eierinformasjon ligger i grunnboken, er personopplysninger og krever innlogging, avtale eller betaling hos Kartverket.</div>
+    <div class="links" style="margin-top:8px"><a href="https://seeiendom.kartverket.no" target="_blank" rel="noopener">Se eiendom (Kartverket)</a></div>
+    ${matrikkel ? `<div class="muted">Søk på matrikkelnummer: <b>${esc(matrikkel)}</b></div>` : ""}`);
+}
+
+/* ---------- Mobildekning ---------- */
+function loadMobil(){
+  setCard("mobil", `
+    <div class="muted">Jeg fant ingen åpen tjeneste som gir dekning for et enkelt punkt, og iPhone gir ikke nettsider tilgang til faktisk signalstyrke. Åpne oversiktene under og søk på stedet eller adressen.</div>
+    <div class="links" style="margin-top:8px">
+      <a href="https://dekningskart.nkom.no" target="_blank" rel="noopener">Nkom (alle nett)</a>
+      <a href="https://www.telenor.no/dekning/" target="_blank" rel="noopener">Telenor</a>
+      <a href="https://www.telia.no/nett/dekning/" target="_blank" rel="noopener">Telia</a>
+      <a href="https://www.ice.no" target="_blank" rel="noopener">Ice</a>
+    </div>
+    <div class="muted">Mobilnettene i Norge er Telenor, Telia og Ice. Dekningskart er modellerte, ikke målte verdier.</div>`);
+}
+
+/* ---------- Natur / verneområder ---------- */
+async function vernQuery(lat, lon, dist){
+  const q = new URLSearchParams({
+    f: "json", geometry: `${lon},${lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+    spatialRel: "esriSpatialRelIntersects",
+    outFields: "naturvernId,navn,offisieltNavn,verneform,faktaark,forvaltningsmyndighet,kommune",
+    returnGeometry: "false"
+  });
+  if(dist){ q.set("distance", dist); q.set("units", "esriSRUnit_Meter"); }
+  const d = await getJson(`${API.vern}?${q}`);
+  if(d.error) throw new Error(d.error.message || "ArcGIS-feil");
+  return (d.features || []).map(f => f.attributes);
+}
+function vernItems(list){
+  return list.map(v => {
+    const link = safeUrl(v.faktaark);
+    return `<div class="item"><div class="n">${esc(v.offisieltNavn || v.navn)}</div>
+      <div class="s">${esc(v.verneform)}${v.forvaltningsmyndighet ? " · " + esc(v.forvaltningsmyndighet) : ""}</div>
+      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}</div>`;
+  }).join("");
+}
+async function loadNatur(lat, lon){
+  const [inn, n100, n1000] = await Promise.all([vernQuery(lat, lon), vernQuery(lat, lon, 100), vernQuery(lat, lon, 1000)]);
+  const key = v => v.naturvernId || v.navn;
+  const seenIn = new Set(inn.map(key));
+  const only100 = n100.filter(v => !seenIn.has(key(v)));
+  const seen100 = new Set(n100.map(key));
+  const only1000 = n1000.filter(v => !seen100.has(key(v)) && !seenIn.has(key(v)));
+
+  let h = `<div class="tier">Du står i</div>` +
+    (inn.length ? vernItems(inn) : `<div class="muted">Ikke i noe registrert verneområde.</div>`);
+  h += `<div class="tier">Innen 100 m</div>` +
+    (only100.length ? vernItems(only100) : `<div class="muted">Ingen.</div>`);
+  h += `<div class="tier">Mellom 100 m og 1 km</div>` +
+    (only1000.length ? vernItems(only1000) : `<div class="muted">Ingen.</div>`);
+  setCard("natur", h);
+}
+
+/* ---------- Kulturminner ---------- */
+const LIMIT = 500;
+function kulturItems(list, max){
+  const shown = list.slice(0, max);
+  let h = shown.map(k => {
+    const link = safeUrl(k.link);
+    return `<div class="item"><span class="dist">${fmtDist(k.d)}</span>
+      <div class="n">${esc(k.navn || "(uten navn)")}</div>
+      <div class="s">${esc(k.vern || "")}${k.kommune ? " · kommune " + esc(k.kommune) : ""}</div>
+      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Kulturminnesøk</a>` : ""}</div>`;
+  }).join("");
+  if(list.length > max)
+    h += `<button class="more" data-more="${list.length}">Vis alle ${list.length} …</button>`;
+  return h;
+}
+async function loadKultur(lat, lon){
+  const dLat = 1050 / 110540;
+  const dLon = 1050 / (111320 * Math.cos(lat * Math.PI / 180));
+  const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(x => x.toFixed(6)).join(",");
+  const d = await getJson(`${API.kultur}?f=json&limit=${LIMIT}&bbox=${bbox}`);
+  const feats = d.features || [];
+  const all = feats.map(f => {
+    const p = f.properties || {};
+    return {
+      navn: p.navn, d: geomDist(f.geometry, lat, lon),
+      vern: p.verneparagraf || p.vernetype || p.lokalitetsart,
+      kommune: p.kommune, link: p["linkKulturminnesøk"]
+    };
+  }).filter(k => isFinite(k.d) && k.d <= 1000).sort((a, b) => a.d - b.d);
+
+  const t100 = all.filter(k => k.d <= 100);
+  const t1000 = all.filter(k => k.d > 100);
+
+  const tierHtml = (list, max, id) => list.length
+    ? `<div id="${id}">${kulturItems(list, max)}</div>`
+    : `<div class="muted">Ingen registrerte kulturminner.</div>`;
+  let h = `<div class="tier">Innen 100 m (${t100.length})</div>` + tierHtml(t100, 20, "k100");
+  h += `<div class="tier">100 m til 1 km (${t1000.length})</div>` + tierHtml(t1000, 15, "k1000");
+  if(feats.length >= LIMIT)
+    h += `<div class="warn">Området har mange treff \u2013 bare de første ${LIMIT} ble hentet, så listen kan være ufullstendig.</div>`;
+  h += `<div class="muted" style="margin-top:8px">Avstand er til nærmeste punkt/kant av kulturminnet. Kulturminner med begrenset offentlighet vises ikke.</div>`;
+  setCard("kultur", h);
+  const lists = {k100: t100, k1000: t1000};
+  document.querySelectorAll("#c-kultur .more").forEach(b => b.addEventListener("click", () => {
+    const box = b.parentElement;
+    box.innerHTML = kulturItems(lists[box.id], lists[box.id].length);
+  }));
+}
+
+/* ---------- hovedflyt ---------- */
+function loading(){
+  ["sted","eiendom","natur","kultur"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
+}
+async function runAll(lat, lon, acc){
+  $("#pos").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? ` · ±${Math.round(acc)} m` : "");
+  loading();
+  loadMobil();
+  const jobs = [
+    loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
+    loadNatur(lat, lon).catch(e => setCard("natur", errHtml(e))),
+    loadKultur(lat, lon).catch(e => setCard("kultur", errHtml(e)))
+  ];
+  await Promise.all(jobs);
+  if(acc && acc > 50){
+    $("#c-sted").insertAdjacentHTML("beforeend",
+      `<div class="warn">GPS-nøyaktigheten er ±${Math.round(acc)} m. Avstander og eiendom kan avvike.</div>`);
+  }
+}
+function parseHash(){
+  const m = location.hash.replace("#", "").match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+  return m ? [parseFloat(m[1]), parseFloat(m[2])] : null;
+}
+function start(){
+  const h = parseHash();
+  if(h){ runAll(h[0], h[1], 0); return; }
+  if(!("geolocation" in navigator)){ $("#pos").textContent = "Posisjon støttes ikke"; return; }
+  $("#refresh").disabled = true;
+  $("#pos").textContent = "Henter posisjon …";
+  navigator.geolocation.getCurrentPosition(
+    p => { $("#refresh").disabled = false; runAll(p.coords.latitude, p.coords.longitude, p.coords.accuracy); },
+    err => {
+      $("#refresh").disabled = false;
+      const msg = err.code === 1 ? "Posisjon er avslått. Tillat stedstjenester for Safari/appen i Innstillinger."
+                : err.code === 3 ? "Fikk ikke posisjon i tide. Prøv igjen utendørs."
+                : "Kunne ikke hente posisjon.";
+      $("#pos").textContent = msg;
+    },
+    {enableHighAccuracy: true, timeout: 25000, maximumAge: 0}
+  );
+}
+$("#refresh").addEventListener("click", start);
+window.addEventListener("hashchange", start);
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(() => {}); }
+start();
+</script>
+</body>
+</html>
