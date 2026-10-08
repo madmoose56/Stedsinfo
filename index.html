@@ -12,6 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
 :root{
   --bg:#f4f5f2; --card:#ffffff; --text:#1c1f1a; --muted:#5f665b; --line:#e1e4dc;
@@ -57,6 +58,13 @@ a{color:var(--accent)}
 .more{background:none;border:0;color:var(--accent);font-weight:600;padding:8px 0}
 footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .spin{color:var(--muted)}
+[hidden]{display:none!important}
+.toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.toggles label{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
+  border-radius:10px;font-weight:600;font-size:15px}
+.toggles input{width:18px;height:18px;accent-color:var(--accent)}
+#map{height:420px;border-radius:12px;border:1px solid var(--line);background:var(--line);
+  position:relative;z-index:0;isolation:isolate}
 </style>
 </head>
 <body>
@@ -74,13 +82,27 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
   <section class="card" id="c-natur"><h2>Natur og verneområder</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
 
+  <section class="card" id="c-kart">
+    <h2>Kart (3 km hver vei)</h2>
+    <div class="toggles" id="kart-valg">
+      <label><input type="checkbox" data-layer="eiendom"> Eiendomsgrenser</label>
+      <label><input type="checkbox" data-layer="vern"> Verneområde</label>
+      <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
+    </div>
+    <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
+    <div class="warn" id="kart-hint" hidden>Eiendomsgrenser vises først når du zoomer litt inn.
+      <button class="more" id="kart-zoom" type="button">Zoom inn</button></div>
+    <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplede ringer er 100 m og 1 km.</div>
+  </section>
+
   <footer>
-    Kilder: Kartverket (adresser, kommuneinfo), Miljødirektoratet (Naturbase verneområder),
+    Kilder: Kartverket (adresser, kommuneinfo, kart og matrikkelkart), Miljødirektoratet (Naturbase verneområder),
     Riksantikvaren (Askeladden/Kulturminnesøk). Data er veiledende, ikke juridisk bindende.
     Tips: legg til <code>#59.9139,10.7522</code> i adressen for å teste en annen posisjon.
   </footer>
 </main>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
 "use strict";
 const API = {
@@ -320,6 +342,89 @@ async function loadKultur(lat, lon){
   }));
 }
 
+/* ---------- kart (Leaflet) ---------- */
+const KART_HALV = 3000; // meter i hver retning
+const KART_LAG = {
+  vern: {
+    url: "https://kart.miljodirektoratet.no/arcgis/services/vern/MapServer/WMSServer",
+    layers: "naturvern_omrade", z: 4, opacity: 0.6, on: true,
+    attr: "Verneområder © Miljødirektoratet"
+  },
+  reservat: {
+    url: "https://kart.miljodirektoratet.no/arcgis/services/vern_hovedtyper/MapServer/WMSServer",
+    layers: "naturvern_naturreservat_omrade", z: 5, opacity: 0.65, on: false,
+    attr: "Naturreservat © Miljødirektoratet"
+  },
+  eiendom: {
+    url: "https://wms.geonorge.no/skwms1/wms.matrikkelkart",
+    layers: "teiger", z: 6, opacity: 1, on: false,
+    attr: "Matrikkelkart © Kartverket"
+  }
+};
+const KART_PREF = "stedsinfo-kart";
+let map = null, kartPos = null, posLayers = [];
+const kartLag = {};
+
+function mppAt(z, lat){ return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z); }
+function kartPrefs(){
+  try{ return JSON.parse(localStorage.getItem(KART_PREF) || "{}"); } catch(e){ return {}; }
+}
+function saveKartPrefs(){
+  const p = {};
+  document.querySelectorAll("#kart-valg input").forEach(i => { p[i.dataset.layer] = i.checked; });
+  try{ localStorage.setItem(KART_PREF, JSON.stringify(p)); } catch(e){}
+}
+function updateKartHint(){
+  if(!map || !kartPos) return;
+  const on = $('#kart-valg input[data-layer="eiendom"]').checked;
+  // eiendomsgrenser tegnes av tjenesten først fra ca. 1:40 000 (≈ 11 m per piksel)
+  $("#kart-hint").hidden = !(on && mppAt(map.getZoom(), kartPos[0]) > 11.2);
+}
+function initMap(){
+  if(map) return true;
+  if(typeof L === "undefined"){
+    $("#kart-info").textContent = "Kartbiblioteket kunne ikke lastes. Sjekk nettforbindelsen og last siden på nytt.";
+    return false;
+  }
+  map = L.map("map", {zoomSnap: 0.25});
+  L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png", {
+    maxZoom: 18, attribution: 'Kartgrunnlag © <a href="https://www.kartverket.no" target="_blank" rel="noopener">Kartverket</a>'
+  }).addTo(map);
+  const prefs = kartPrefs();
+  document.querySelectorAll("#kart-valg input").forEach(box => {
+    const key = box.dataset.layer, def = KART_LAG[key];
+    kartLag[key] = L.tileLayer.wms(def.url, {
+      layers: def.layers, format: "image/png", transparent: true, version: "1.3.0",
+      opacity: def.opacity, zIndex: def.z, attribution: def.attr
+    });
+    box.checked = key in prefs ? !!prefs[key] : def.on;
+    if(box.checked) kartLag[key].addTo(map);
+    box.addEventListener("change", () => {
+      if(box.checked) kartLag[key].addTo(map); else kartLag[key].remove();
+      saveKartPrefs(); updateKartHint();
+    });
+  });
+  map.on("zoomend", updateKartHint);
+  $("#kart-zoom").addEventListener("click", () => { if(kartPos) map.setView(kartPos, 14); });
+  return true;
+}
+function showKart(lat, lon, acc){
+  if(!initMap()) return;
+  kartPos = [lat, lon];
+  posLayers.forEach(l => l.remove());
+  posLayers = [];
+  const ring = r => L.circle(kartPos, {radius: r, color: "#14532d", weight: 1.5, dashArray: "5 5", fill: false});
+  posLayers.push(ring(100), ring(1000));
+  if(acc && acc > 5) posLayers.push(L.circle(kartPos, {radius: acc, color: "#2563eb", weight: 1, fillOpacity: 0.12}));
+  posLayers.push(L.circleMarker(kartPos, {radius: 7, color: "#ffffff", weight: 2.5, fillColor: "#2563eb", fillOpacity: 1}));
+  posLayers.forEach(l => l.addTo(map));
+  const dLat = KART_HALV / 110540;
+  const dLon = KART_HALV / (111320 * Math.cos(lat * Math.PI / 180));
+  map.invalidateSize();
+  map.fitBounds([[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]], {animate: false});
+  updateKartHint();
+}
+
 /* ---------- hovedflyt ---------- */
 function loading(){
   ["sted","eiendom","natur","kultur"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
@@ -328,6 +433,7 @@ async function runAll(lat, lon, acc){
   $("#pos").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? ` · ±${Math.round(acc)} m` : "");
   loading();
   loadMobil();
+  showKart(lat, lon, acc);
   const jobs = [
     loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
     loadNatur(lat, lon).catch(e => setCard("natur", errHtml(e))),
