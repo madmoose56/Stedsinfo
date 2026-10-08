@@ -241,22 +241,19 @@ async function loadSted(lat, lon){
 
   // Eier
   setCard("eier", `
-    <div class="muted">Eier av eiendommen er <b>ikke åpne data</b>. Eierinformasjon ligger i grunnboken, er personopplysninger og krever innlogging, avtale eller betaling hos Kartverket.</div>
-    <div class="links" style="margin-top:8px"><a href="https://seeiendom.kartverket.no" target="_blank" rel="noopener">Se eiendom (Kartverket)</a></div>
+    <div class="links"><a href="https://seeiendom.kartverket.no" target="_blank" rel="noopener">Se eiendom (Kartverket)</a></div>
     ${matrikkel ? `<div class="muted">Søk på matrikkelnummer: <b>${esc(matrikkel)}</b></div>` : ""}`);
 }
 
 /* ---------- Mobildekning ---------- */
 function loadMobil(){
   setCard("mobil", `
-    <div class="muted">Jeg fant ingen åpen tjeneste som gir dekning for et enkelt punkt, og iPhone gir ikke nettsider tilgang til faktisk signalstyrke. Åpne oversiktene under og søk på stedet eller adressen.</div>
-    <div class="links" style="margin-top:8px">
+    <div class="links">
       <a href="https://dekningskart.nkom.no" target="_blank" rel="noopener">Nkom (alle nett)</a>
       <a href="https://www.telenor.no/dekning/" target="_blank" rel="noopener">Telenor</a>
       <a href="https://www.telia.no/nett/dekning/" target="_blank" rel="noopener">Telia</a>
       <a href="https://www.ice.no" target="_blank" rel="noopener">Ice</a>
-    </div>
-    <div class="muted">Mobilnettene i Norge er Telenor, Telia og Ice. Dekningskart er modellerte, ikke målte verdier.</div>`);
+    </div>`);
 }
 
 /* ---------- Natur / verneområder ---------- */

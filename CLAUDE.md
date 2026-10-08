@@ -8,7 +8,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v3).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v4).
 - Appen har også kart med lagvalg (eiendomsgrenser, verneområde, naturreservat); starter med 100 m radius, knapp bytter til 1 km.
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
