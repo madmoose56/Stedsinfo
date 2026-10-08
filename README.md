@@ -1,4 +1,4 @@
-# Her
+# Stedsinfo
 
 PWA for iPhone som viser informasjon om posisjonen du står på (Norge):
 
