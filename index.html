@@ -53,8 +53,14 @@ button{font:inherit}
 .item .s{color:var(--muted);font-size:14px}
 .dist{float:right;font-variant-numeric:tabular-nums;font-weight:700;margin-left:10px}
 a{color:var(--accent)}
-.links a{display:inline-block;margin:4px 8px 4px 0;padding:8px 12px;border:1px solid var(--line);
-  border-radius:10px;text-decoration:none;font-weight:600}
+.links a,.links button{display:inline-block;margin:4px 8px 4px 0;padding:8px 12px;border:1px solid var(--line);
+  border-radius:10px;text-decoration:none;font-weight:600;background:none;color:var(--accent)}
+#kart-close{display:none}
+body.kartfull{overflow:hidden}
+body.kartfull #map{position:fixed;top:0;left:0;right:0;bottom:0;height:auto;z-index:1000;border-radius:0;border:0}
+body.kartfull #kart-close{display:block;position:fixed;z-index:1001;top:calc(env(safe-area-inset-top) + 10px);
+  left:50%;transform:translateX(-50%);background:#fff;color:#14532d;border:2px solid rgba(0,0,0,.3);
+  border-radius:8px;padding:8px 14px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .more{background:none;border:0;color:var(--accent);font-weight:600;padding:8px 0}
 footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .spin{color:var(--muted)}
@@ -121,6 +127,8 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
+    <button type="button" class="more" id="kart-full">Åpne i full størrelse ↗</button>
+    <button type="button" id="kart-close">‹ Tilbake</button>
     <div class="warn" id="kart-hint" hidden>Eiendomsgrenser vises først når du zoomer litt inn.
       <button class="more" id="kart-zoom" type="button">Zoom inn</button></div>
     <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplet ring viser radius 100 m.</div>
@@ -264,7 +272,7 @@ async function loadSted(lat, lon){
   } else {
     e += `<div class="muted">Fant ikke gnr/bnr – ingen adresse nær nok.</div>`;
   }
-  e += `<div class="links" style="margin-top:8px"><a href="https://kartkatalog.geonorge.no/metadata/74340c24-1c8a-4454-b813-bfe498e80f16" target="_blank" rel="noopener">Matrikkel – eiendomskart Teig (GeoNorge)</a></div>`;
+  e += `<div class="links" style="margin-top:8px"><button type="button" data-act="eiendom-kart">Matrikkel – eiendomskart Teig (GeoNorge)</button></div>`;
   setCard("eiendom", e);
 
   // Eier
@@ -479,6 +487,24 @@ function showKart(lat, lon, acc){
   kartAcc = acc || 0;
   drawKart();
 }
+
+let kartFullView = null;
+function kartFull(on){
+  if(!map) return;
+  if(on){ kartFullView = [map.getCenter(), map.getZoom()]; }
+  document.body.classList.toggle("kartfull", on);
+  map.invalidateSize({pan: false});
+  if(!on && kartFullView){ map.setView(kartFullView[0], kartFullView[1], {animate: false}); }
+}
+$("#kart-full").addEventListener("click", () => kartFull(true));
+$("#kart-close").addEventListener("click", () => kartFull(false));
+document.addEventListener("click", ev => {
+  if(!ev.target.closest('[data-act="eiendom-kart"]') || !map || !kartPos) return;
+  const cb = $('#kart-valg input[data-layer="eiendom"]');
+  if(!cb.checked){ cb.checked = true; cb.dispatchEvent(new Event("change")); }
+  kartFull(true);
+  map.setView(kartPos, 17, {animate: false});
+});
 
 /* ---------- hovedflyt ---------- */
 function loading(){
