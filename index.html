@@ -77,7 +77,10 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .f input{display:block;width:100%;margin-top:4px;padding:11px 12px;font:16px -apple-system,BlinkMacSystemFont,sans-serif;
   color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px}
 .frow{display:flex;gap:10px}
-.frow .nr{flex:0 0 28%}.frow .pnr{flex:1}
+.frow .gate{flex:1;min-width:0}.frow .nr{flex:0 0 76px}
+.frow.eller{align-items:flex-end}
+.frow .pnr{flex:0 0 36%}.frow .sted{flex:1;min-width:0}
+.ell{align-self:flex-end;margin-bottom:21px;color:var(--muted);font-size:14px}
 #adr-res .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
   border:1px solid var(--line);border-radius:10px;color:var(--text)}
 .toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
@@ -101,12 +104,15 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
 
   <form class="card" id="p-adr" hidden autocomplete="off">
     <h2>Søk på adresse i Norge</h2>
-    <label class="f">Gate<input id="f-gate" type="text" autocapitalize="words" enterkeyhint="search" placeholder="f.eks. Karl Johans gate"></label>
     <div class="frow">
+      <label class="f gate">Gate<input id="f-gate" type="text" autocapitalize="words" enterkeyhint="search" placeholder="f.eks. Karl Johans gate"></label>
       <label class="f nr">Nr<input id="f-nr" type="text" inputmode="text" autocapitalize="characters" placeholder="12B"></label>
-      <label class="f pnr">Postnummer<input id="f-pnr" type="text" inputmode="numeric" maxlength="4" placeholder="0154"></label>
     </div>
-    <label class="f">Sted<input id="f-sted" type="text" autocapitalize="words" placeholder="f.eks. Oslo"></label>
+    <div class="frow eller">
+      <label class="f pnr">Postnummer<input id="f-pnr" type="text" inputmode="numeric" maxlength="4" placeholder="0154"></label>
+      <span class="ell">eller</span>
+      <label class="f sted">Sted<input id="f-sted" type="text" autocapitalize="words" placeholder="f.eks. Oslo"></label>
+    </div>
     <button class="btn" id="adr-go" type="submit">Søk</button>
     <div id="adr-res"></div>
   </form>
