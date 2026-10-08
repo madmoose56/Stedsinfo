@@ -105,9 +105,6 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
     <div id="adr-res"></div>
   </form>
 
-  <div id="p-pos">
-    <button class="btn" id="refresh">Oppdater posisjon</button>
-  </div>
 
   <section class="card" id="c-sted"><h2>Sted</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-eiendom"><h2>Eiendom</h2><div class="spin">Henter …</div></section>
@@ -512,12 +509,10 @@ function start(){
   const h = parseHash();
   if(h){ runAll(h[0], h[1], 0); return; }
   if(!("geolocation" in navigator)){ $("#pos").textContent = "Posisjon støttes ikke"; return; }
-  $("#refresh").disabled = true;
   $("#pos").textContent = "Henter posisjon …";
   navigator.geolocation.getCurrentPosition(
-    p => { $("#refresh").disabled = false; runAll(p.coords.latitude, p.coords.longitude, p.coords.accuracy); },
+    p => { runAll(p.coords.latitude, p.coords.longitude, p.coords.accuracy); },
     err => {
-      $("#refresh").disabled = false;
       const msg = err.code === 1 ? "Posisjon er avslått. Tillat stedstjenester for Safari/appen i Innstillinger."
                 : err.code === 3 ? "Fikk ikke posisjon i tide. Prøv igjen utendørs."
                 : "Kunne ikke hente posisjon.";
@@ -529,7 +524,6 @@ function start(){
 /* ---------- adressesøk ---------- */
 function setMode(m){
   $("#p-adr").hidden = m !== "adr";
-  $("#p-pos").hidden = m !== "pos";
   document.querySelectorAll("#mode button").forEach(b => {
     const on = b.dataset.mode === m;
     b.classList.toggle("on", on);
@@ -577,7 +571,6 @@ async function sokAdresse(ev){
 }
 $("#mode").addEventListener("click", e => { const b = e.target.closest("button"); if(b) setMode(b.dataset.mode); });
 $("#p-adr").addEventListener("submit", sokAdresse);
-$("#refresh").addEventListener("click", start);
 window.addEventListener("hashchange", () => { setMode("pos"); });
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(() => {}); }
 start();
