@@ -81,7 +81,7 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .frow.eller{align-items:flex-end}
 .frow .pnr{flex:0 0 36%}.frow .sted{flex:1;min-width:0}
 .ell{align-self:flex-end;margin-bottom:21px;color:var(--muted);font-size:14px}
-#adr-res .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
+#adr-res .pick,#kart-liste .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
   border:1px solid var(--line);border-radius:10px;color:var(--text)}
 .toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .toggles label{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
@@ -136,6 +136,8 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
     <button type="button" class="more" id="kart-full">Åpne i full størrelse ↗</button>
+    <button type="button" class="more" id="kart-liste-btn" style="margin-left:16px">Vis liste</button>
+    <div id="kart-liste" hidden></div>
     <button type="button" id="kart-close">‹ Tilbake</button>
     <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplet ring viser radius 100 m.</div>
   </section>
@@ -297,17 +299,41 @@ function loadMobil(){
 }
 
 /* ---------- Natur / verneområder ---------- */
-async function vernQuery(lat, lon, dist){
+async function vernQuery(lat, lon, dist, geom){
   const q = new URLSearchParams({
     f: "json", geometry: `${lon},${lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
     spatialRel: "esriSpatialRelIntersects",
     outFields: "naturvernId,navn,offisieltNavn,verneform,faktaark,forvaltningsmyndighet,kommune",
-    returnGeometry: "false"
+    returnGeometry: geom ? "true" : "false"
   });
+  if(geom){ q.set("outSR", "4326"); q.set("maxAllowableOffset", "0.0003"); }
   if(dist){ q.set("distance", dist); q.set("units", "esriSRUnit_Meter"); }
   const d = await getJson(`${API.vern}?${q}`);
   if(d.error) throw new Error(d.error.message || "ArcGIS-feil");
-  return (d.features || []).map(f => f.attributes);
+  return (d.features || []).map(f => Object.assign({}, f.attributes, {_rings: f.geometry && f.geometry.rings}));
+}
+// nærmeste avstand, nærmeste hjørne og omriss for en polygon (ArcGIS-ringer, [lon, lat])
+function ringsInfo(rings, lat, lon){
+  let d = Infinity, pt = null, best = Infinity, b = null;
+  (rings || []).forEach(r => {
+    d = Math.min(d, lineDist(r, lon, lat));
+    r.forEach(c => {
+      const p = proj(c[0], c[1], lon, lat), h = Math.hypot(p[0], p[1]);
+      if(h < best){ best = h; pt = [c[1], c[0]]; }
+      b = b ? [[Math.min(b[0][0], c[1]), Math.min(b[0][1], c[0])], [Math.max(b[1][0], c[1]), Math.max(b[1][1], c[0])]]
+            : [[c[1], c[0]], [c[1], c[0]]];
+    });
+  });
+  return {d, pt, bounds: b};
+}
+// nærmeste punkt (hjørne) på en GeoJSON-geometri, som [lat, lon]
+function nearestPt(g, lat, lon){
+  const pts = [];
+  (function flat(c){ if(typeof c[0] === "number") pts.push(c); else c.forEach(flat); })(
+    g ? (g.type === "GeometryCollection" ? g.geometries.map(x => x.coordinates) : g.coordinates) : []);
+  let best = Infinity, pt = null;
+  pts.forEach(c => { const p = proj(c[0], c[1], lon, lat), h = Math.hypot(p[0], p[1]); if(h < best){ best = h; pt = [c[1], c[0]]; } });
+  return pt;
 }
 function vernItems(list){
   return list.map(v => {
@@ -318,7 +344,7 @@ function vernItems(list){
   }).join("");
 }
 async function loadNatur(lat, lon){
-  const [inn, n100, n1000] = await Promise.all([vernQuery(lat, lon), vernQuery(lat, lon, 100), vernQuery(lat, lon, 1000)]);
+  const [inn, n100, n1000] = await Promise.all([vernQuery(lat, lon), vernQuery(lat, lon, 100), vernQuery(lat, lon, 1000, true)]);
   const key = v => v.naturvernId || v.navn;
   const seenIn = new Set(inn.map(key));
   const only100 = n100.filter(v => !seenIn.has(key(v)));
@@ -332,6 +358,12 @@ async function loadNatur(lat, lon){
   h += `<div class="tier">Mellom 100 m og 1 km</div>` +
     (only1000.length ? vernItems(only1000) : `<div class="muted">Ingen.</div>`);
   setCard("natur", h);
+  kartListe.vern = n1000.map(v => {
+    const info = ringsInfo(v._rings, lat, lon);
+    return {navn: v.offisieltNavn || v.navn || "(uten navn)", art: v.verneform || "",
+      d: seenIn.has(key(v)) ? 0 : info.d, pt: info.pt, bounds: info.bounds, link: safeUrl(v.faktaark),
+      type: /reservat/i.test(v.verneform || "") ? "reservat" : "vern"};
+  }).filter(x => isFinite(x.d));
   setTreff("vern", n1000.length > 0);
   setTreff("reservat", n1000.some(v => /reservat/i.test(v.verneform || "")));
 }
@@ -360,7 +392,7 @@ async function loadKultur(lat, lon){
   const all = feats.map(f => {
     const p = f.properties || {};
     return {
-      navn: p.navn, d: geomDist(f.geometry, lat, lon),
+      navn: p.navn, d: geomDist(f.geometry, lat, lon), pt: nearestPt(f.geometry, lat, lon),
       vern: p.verneparagraf || p.vernetype || p.lokalitetsart,
       kommune: p.kommune, link: p["linkKulturminnesøk"]
     };
@@ -378,6 +410,7 @@ async function loadKultur(lat, lon){
     h += `<div class="warn">Området har mange treff \u2013 bare de første ${LIMIT} ble hentet, så listen kan være ufullstendig.</div>`;
   h += `<div class="muted" style="margin-top:8px">Avstand er til nærmeste punkt/kant av kulturminnet. Kulturminner med begrenset offentlighet vises ikke.</div>`;
   setCard("kultur", h);
+  kartListe.kultur = all;
   setTreff("kultur", all.length > 0);
   const lists = {k100: t100, k1000: t1000};
   document.querySelectorAll("#c-kultur .more").forEach(b => b.addEventListener("click", () => {
@@ -429,8 +462,54 @@ function updateKartValg(){
     }
   });
   $("#kart-valg").hidden = !any;
+  if(kartListeOpen) renderListe();
 }
 function setTreff(k, v){ kartTreff[k] = v; updateKartValg(); }
+
+/* ---------- liste over treff (sortert på avstand) ---------- */
+const kartListe = {kultur: [], vern: []};
+let kartListeOpen = false, kartListeN = 30, kartListeVis = [], kartMark = null;
+function renderListe(){
+  const box = $("#kart-liste");
+  box.hidden = !kartListeOpen;
+  if(!kartListeOpen) return;
+  const on = k => kartTreff[k] === true && $(`#kart-valg input[data-layer="${k}"]`).checked;
+  const items = [];
+  if(on("kultur")) kartListe.kultur.forEach(k => items.push({navn: k.navn || "(uten navn)", art: k.vern || "Kulturminne", d: k.d, pt: k.pt, link: safeUrl(k.link)}));
+  kartListe.vern.forEach(v => { if(on(v.type) || on("vern")) items.push(v); });
+  items.sort((a, b) => a.d - b.d);
+  kartListeVis = items;
+  if(!items.length){ box.innerHTML = `<div class="muted">Ingen treff i de valgte lagene.</div>`; return; }
+  box.innerHTML = items.slice(0, kartListeN).map((x, i) =>
+    `<button type="button" class="pick" data-i="${i}"><span class="dist">${x.d < 1 ? "Her" : fmtDist(x.d)}</span>` +
+    `<b>${esc(x.navn)}</b><br><span class="muted">${esc(x.art)}</span></button>`).join("") +
+    (items.length > kartListeN ? `<button type="button" class="more" id="liste-mer">Vis flere (${items.length - kartListeN})</button>` : "");
+}
+function visPaaKart(x){
+  if(!map || !kartPos || (!x.pt && !x.bounds)) return;
+  if(!kartMark) kartMark = L.layerGroup().addTo(map);
+  kartMark.clearLayers();
+  if(x.d < 1 && x.bounds){
+    map.fitBounds(x.bounds, {animate: false, padding: [20, 20]});
+  } else {
+    kartMark.addLayer(L.polyline([kartPos, x.pt], {color: "#c2410c", weight: 2, dashArray: "4 6"}));
+    kartMark.addLayer(L.circleMarker(x.pt, {radius: 8, color: "#fff", weight: 2.5, fillColor: "#c2410c", fillOpacity: 1})
+      .bindTooltip(x.navn, {permanent: true, direction: "top", offset: [0, -8]}));
+    map.fitBounds([kartPos, x.pt], {animate: false, padding: [45, 45], maxZoom: 17});
+  }
+  $("#map").scrollIntoView({block: "center", behavior: "smooth"});
+}
+$("#kart-liste-btn").addEventListener("click", () => {
+  kartListeOpen = !kartListeOpen;
+  $("#kart-liste-btn").textContent = kartListeOpen ? "Skjul liste" : "Vis liste";
+  kartListeN = 30;
+  renderListe();
+});
+$("#kart-liste").addEventListener("click", e => {
+  const p = e.target.closest(".pick"), m = e.target.closest("#liste-mer");
+  if(m){ kartListeN += 30; renderListe(); }
+  else if(p) visPaaKart(kartListeVis[+p.dataset.i]);
+});
 function lonLatTo3857(lon, lat){
   return [lon * 20037508.34 / 180, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * 6378137];
 }
@@ -544,6 +623,8 @@ async function runAll(lat, lon, acc, fraAdresse){
   $("#pos").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? ` · ±${Math.round(acc)} m` : "");
   loading();
   Object.keys(kartTreff).forEach(k => { kartTreff[k] = null; });
+  kartListe.kultur = []; kartListe.vern = [];
+  if(kartMark) kartMark.clearLayers();
   updateKartValg();
   loadMobil();
   showKart(lat, lon, acc);
