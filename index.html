@@ -99,7 +99,8 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .kart-fullbtn{background:#fff;color:#14532d;border:2px solid rgba(0,0,0,.3);border-radius:8px;padding:4px 8px;
   font:700 12px/1.15 -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;
   box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
-body.kartfull .kart-fullbtn{display:none}
+.kart-hjorne{display:flex;align-items:flex-end;gap:6px}
+body.kartfull .kart-hjorne{display:none}
 .kart-radius-box{display:flex;flex-direction:column;gap:6px}
 .seg{display:flex;margin:4px 0 12px;border:1px solid var(--accent);border-radius:12px;overflow:hidden}
 .seg button{flex:1;border:0;background:var(--card);color:var(--accent);padding:12px 8px;font-weight:600}
@@ -669,25 +670,13 @@ function initMap(){
     }
   });
   map.addControl(new RadiusCtl());
-  // liten knapp nede i høyre hjørne som åpner kartet i full størrelse
-  const FullCtl = L.Control.extend({
+  // nede til høyre, på samme linje: bytte av bunnkart (Kart / Flyfoto / Bygninger) og «full størrelse»
+  const HjorneCtl = L.Control.extend({
     options: {position: "bottomright"},
     onAdd(){
-      const b = L.DomUtil.create("button", "kart-fullbtn");
-      b.type = "button";
-      b.innerHTML = "full<br>størrelse";
-      L.DomEvent.disableClickPropagation(b);
-      L.DomEvent.on(b, "click", () => kartFull(true));
-      return b;
-    }
-  });
-  map.addControl(new FullCtl());
-  // bytte av bunnkart: Kart / Flyfoto (satellitt) / Bygninger (tydelige bygninger i tettbygde strøk)
-  const BaseCtl = L.Control.extend({
-    options: {position: "topleft"},
-    onAdd(){
-      const box = L.DomUtil.create("div", "kart-base-box");
-      L.DomEvent.disableClickPropagation(box);
+      const rad = L.DomUtil.create("div", "kart-hjorne");
+      L.DomEvent.disableClickPropagation(rad);
+      const box = L.DomUtil.create("div", "kart-base-box", rad);
       [["kart", "Kart"], ["flyfoto", "Flyfoto"], ["bygg", "Bygninger"]].forEach(([k, navn]) => {
         const b = L.DomUtil.create("button", "kart-base" + (k === kartBaseNavn ? " on" : ""), box);
         b.type = "button";
@@ -702,10 +691,14 @@ function initMap(){
           try{ localStorage.setItem(KART_BASE, k); } catch(e){}
         });
       });
-      return box;
+      const full = L.DomUtil.create("button", "kart-fullbtn", rad);
+      full.type = "button";
+      full.innerHTML = "full<br>størrelse";
+      L.DomEvent.on(full, "click", () => kartFull(true));
+      return rad;
     }
   });
-  map.addControl(new BaseCtl());
+  map.addControl(new HjorneCtl());
   // navn ved markørene vises bare når kartet er zoomet nok inn
   const toggleLab = () => $("#map").classList.toggle("nolab", map.getZoom() < 16);
   map.on("zoomend", toggleLab);
