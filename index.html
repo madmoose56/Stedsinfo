@@ -677,7 +677,7 @@ function initMap(){
       const rad = L.DomUtil.create("div", "kart-hjorne");
       L.DomEvent.disableClickPropagation(rad);
       const box = L.DomUtil.create("div", "kart-base-box", rad);
-      [["kart", "Kart"], ["flyfoto", "Flyfoto"], ["bygg", "Bygninger"]].forEach(([k, navn]) => {
+      [["kart", "Topo"], ["flyfoto", "Flyfoto"], ["bygg", "Bygninger"]].forEach(([k, navn]) => {
         const b = L.DomUtil.create("button", "kart-base" + (k === kartBaseNavn ? " on" : ""), box);
         b.type = "button";
         b.textContent = navn;
