@@ -59,7 +59,7 @@ a{color:var(--accent)}
 .links.rad a{flex:1;min-width:0;margin:4px 0;padding:8px 4px;display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap}
 .links a .op{width:22px;height:22px;vertical-align:middle;margin:0 6px 0 0;flex:none}
 .kbadge{display:inline-block;background:#c2410c;color:#fff;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700}
-.kmark{transform:translate(-50%,-50%);background:#c2410c;color:#fff;border:2px solid #fff;border-radius:10px;
+.kmark{display:block;width:max-content;transform:translate(-50%,-50%);background:#c2410c;color:#fff;border:2px solid #fff;border-radius:10px;
   padding:3px 6px;font:700 12px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;
   box-shadow:0 1px 4px rgba(0,0,0,.4)}
 #kart-close{display:none}
@@ -314,7 +314,7 @@ async function vernQuery(lat, lon, dist, geom){
     outFields: "naturvernId,navn,offisieltNavn,verneform,faktaark,forvaltningsmyndighet,kommune",
     returnGeometry: geom ? "true" : "false"
   });
-  if(geom){ q.set("outSR", "4326"); q.set("maxAllowableOffset", "0.0003"); }
+  if(geom){ q.set("outSR", "4326"); q.set("maxAllowableOffset", "0.0001"); }
   if(dist){ q.set("distance", dist); q.set("units", "esriSRUnit_Meter"); }
   const d = await getJson(`${API.vern}?${q}`);
   if(d.error) throw new Error(d.error.message || "ArcGIS-feil");
@@ -346,34 +346,33 @@ function nearestPt(g, lat, lon){
 function vernItems(list){
   return list.map(v => {
     const link = safeUrl(v.faktaark);
-    return `<div class="item"><div class="n">${esc(v.offisieltNavn || v.navn)}</div>
+    return `<div class="item"><div class="n">${esc(v.offisieltNavn || v.navn)}${v._d != null ? ` <span class="muted">· ${fmtDist(v._d)}</span>` : ""}</div>
       <div class="s">${esc(v.verneform)}${v.forvaltningsmyndighet ? " · " + esc(v.forvaltningsmyndighet) : ""}</div>
       ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}</div>`;
   }).join("");
 }
 async function loadNatur(lat, lon){
-  const [inn, n100, n1000] = await Promise.all([vernQuery(lat, lon), vernQuery(lat, lon, 100), vernQuery(lat, lon, 1000, true)]);
+  const [inn, n1000] = await Promise.all([vernQuery(lat, lon), vernQuery(lat, lon, 1000, true)]);
   const key = v => v.naturvernId || v.navn;
   const seenIn = new Set(inn.map(key));
-  const only100 = n100.filter(v => !seenIn.has(key(v)));
-  const seen100 = new Set(n100.map(key));
-  const only1000 = n1000.filter(v => !seen100.has(key(v)) && !seenIn.has(key(v)));
+  const info = new Map(n1000.map(v => [key(v), ringsInfo(v._rings, lat, lon)]));
+  const naer = n1000.filter(v => !seenIn.has(key(v)))
+    .map(v => Object.assign({}, v, {_d: info.get(key(v)).d}))
+    .filter(v => v._d <= 1000).sort((x, y) => x._d - y._d);
 
-  let h = `<div class="tier">Du står i</div>` +
+  let h = `<div class="tier">Der du står</div>` +
     (inn.length ? vernItems(inn) : `<div class="muted">Ikke i noe registrert verneområde.</div>`);
-  h += `<div class="tier">Innen 100 m</div>` +
-    (only100.length ? vernItems(only100) : `<div class="muted">Ingen.</div>`);
-  h += `<div class="tier">Mellom 100 m og 1 km</div>` +
-    (only1000.length ? vernItems(only1000) : `<div class="muted">Ingen.</div>`);
+  if(naer.length) h += `<div class="tier">Innen 1 km</div>` + vernItems(naer);
   setCard("natur", h);
+  const erReservat = v => /reservat/i.test(v.verneform || "");
   kartListe.vern = n1000.map(v => {
-    const info = ringsInfo(v._rings, lat, lon);
-    return {navn: v.offisieltNavn || v.navn || "(uten navn)", art: v.verneform || "",
-      d: seenIn.has(key(v)) ? 0 : info.d, pt: info.pt, bounds: info.bounds, link: safeUrl(v.faktaark),
-      type: /reservat/i.test(v.verneform || "") ? "reservat" : "vern"};
+    const i = info.get(key(v));
+    return {navn: v.offisieltNavn || v.navn || "(uten navn)", art: v.verneform || "", rings: v._rings,
+      d: seenIn.has(key(v)) ? 0 : i.d, type: erReservat(v) ? "reservat" : "vern"};
   }).filter(x => x.d <= 1000);
-  setTreff("vern", n1000.length > 0);
-  setTreff("reservat", n1000.some(v => /reservat/i.test(v.verneform || "")));
+  drawVernPolys();
+  setTreff("vern", kartListe.vern.some(x => x.type === "vern"));
+  setTreff("reservat", kartListe.vern.some(x => x.type === "reservat"));
 }
 
 /* ---------- Kulturminner ---------- */
@@ -439,16 +438,8 @@ async function loadKultur(lat, lon){
 let kartRadius = 100; // meter: 100 eller 1000. Kartet starter på 100 m.
 let kartAcc = 0, kartBtn = null, kartFraAdresse = false;
 const KART_LAG = {
-  vern: {
-    url: "https://kart.miljodirektoratet.no/arcgis/services/vern/MapServer/WMSServer",
-    layers: "naturvern_omrade", z: 4, opacity: 0.6, on: true,
-    attr: "Verneområder © Miljødirektoratet"
-  },
-  reservat: {
-    url: "https://kart.miljodirektoratet.no/arcgis/services/vern_hovedtyper/MapServer/WMSServer",
-    layers: "naturvern_naturreservat_omrade", z: 5, opacity: 0.65, on: true,
-    attr: "Naturreservat © Miljødirektoratet"
-  },
+  vern: {on: true},      // tegnes som skravert polygon fra Miljødirektoratets data (se drawVernPolys)
+  reservat: {on: true},
   kultur: {
     url: "https://kart.ra.no/wms/kulturminner2",
     layers: "Kulturminner", z: 6, opacity: 0.9, on: true,
@@ -476,6 +467,29 @@ function updateKartValg(){
   drawKultMarks();
 }
 // K1, K2 … på kartet. Vises bare når Kulturminner er avkrysset og treffet er innenfor valgt radius.
+// skravering av verneområder (grønn) og naturreservat (lilla)
+let hatchRenderer = null;
+const HATCH = {vern: {id: "hatch-vern", farge: "#15803d"}, reservat: {id: "hatch-reservat", farge: "#7e22ce"}};
+function hatchInit(){
+  if(hatchRenderer || !map || !map._loaded) return; // SVG-laget finnes først når kartet har fått en visning
+  hatchRenderer = L.svg({padding: 0.5}).addTo(map);
+  hatchRenderer._container.insertAdjacentHTML("afterbegin", "<defs>" + Object.keys(HATCH).map(k =>
+    `<pattern id="${HATCH[k].id}" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(45)">` +
+    `<rect width="9" height="9" fill="${HATCH[k].farge}" fill-opacity="0.10"/>` +
+    `<line x1="0" y1="0" x2="0" y2="9" stroke="${HATCH[k].farge}" stroke-width="2.5" stroke-opacity="0.75"/></pattern>`).join("") + "</defs>");
+}
+function drawVernPolys(){
+  hatchInit();
+  if(!map || !hatchRenderer) return;
+  kartLag.vern.clearLayers();
+  kartLag.reservat.clearLayers();
+  kartListe.vern.forEach(v => {
+    const h = HATCH[v.type];
+    L.polygon((v.rings || []).map(r => r.map(c => [c[1], c[0]])), {
+      renderer: hatchRenderer, color: h.farge, weight: 2, opacity: 0.9, fillColor: "url(#" + h.id + ")", fillOpacity: 1
+    }).bindPopup(`<b>${esc(v.navn)}</b><br>${esc(v.art)}${v.d >= 1 ? " · " + fmtDist(v.d) : ""}`).addTo(kartLag[v.type]);
+  });
+}
 // treff som brukes til K1, K2 … på kartet
 const kartListe = {kultur: [], vern: []};
 let kartK = null;
@@ -513,10 +527,10 @@ function initMap(){
   const prefs = kartPrefs();
   document.querySelectorAll("#kart-valg input").forEach(box => {
     const key = box.dataset.layer, def = KART_LAG[key];
-    kartLag[key] = L.tileLayer.wms(def.url, {
+    kartLag[key] = def.url ? L.tileLayer.wms(def.url, {
       layers: def.layers, format: "image/png", transparent: true, version: "1.3.0",
       opacity: def.opacity, zIndex: def.z, attribution: def.attr
-    });
+    }) : L.layerGroup();
     box.checked = key in prefs ? !!prefs[key] : def.on;
     box.addEventListener("change", () => { saveKartPrefs(); updateKartValg(); });
   });
@@ -581,6 +595,8 @@ function showKart(lat, lon, acc){
   kartPos = [lat, lon];
   kartAcc = acc || 0;
   drawKart();
+  drawVernPolys();
+  updateKartValg();
 }
 
 let kartFullView = null;
