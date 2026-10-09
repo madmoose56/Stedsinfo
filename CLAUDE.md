@@ -9,12 +9,13 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v15).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v16).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Kart
-- Kartverket topo som bunn. Lag med avkrysning: kulturminner, verneområde, naturreservat, turstier. Lag uten treff innen 1 km skjules.
-- «Vis liste» under kartet viser treff sortert på avstand; trykk på ett for å se det på kartet.
+- Kartverket topo som bunn. Lag med avkrysning: kulturminner, verneområde, naturreservat (turstier er fjernet). Lag uten treff innen 1 km skjules.
+- Kulturminner: bare de 50 nærmeste innen 1 km (100 m-gruppe og 100 m–1 km). Riksantikvarens API (api.ra.no) tar med oppføringer uten geometri fra hele landet, så spørringen må avgrenses med `kommune=` (kommunene rundt posisjonen) i tillegg til `bbox`.
+- «Vis liste» under kartet viser først 5 treff sortert på avstand, «Vis flere» gir 10 til; trykk på ett for å se det på kartet.
 - «Åpne i full størrelse» gir fullskjerm. Radiusknapp bytter mellom 100 m og 1 km.
 
 ## Arbeidsmåte

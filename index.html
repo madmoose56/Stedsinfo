@@ -132,7 +132,6 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
       <label><input type="checkbox" data-layer="kultur"> Kulturminner</label>
       <label><input type="checkbox" data-layer="vern"> Verneområde</label>
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
-      <label><input type="checkbox" data-layer="tur"> Turstier</label>
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
     <button type="button" class="more" id="kart-full">Åpne i full størrelse ↗</button>
@@ -174,9 +173,9 @@ function rows(pairs){
   return pairs.filter(p => p[1] !== null && p[1] !== undefined && p[1] !== "")
     .map(p => `<div class="row"><span>${esc(p[0])}</span><span>${esc(p[1])}</span></div>`).join("");
 }
-async function getJson(url){
+async function getJson(url, timeout){
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 20000);
+  const t = setTimeout(() => ctl.abort(), timeout || 20000);
   try{
     const r = await fetch(url, {signal: ctl.signal, headers: {"Accept": "application/json"}});
     if(!r.ok) throw new Error("HTTP " + r.status);
@@ -379,44 +378,53 @@ function kulturItems(list, max){
       <div class="s">${esc(k.vern || "")}${k.kommune ? " · kommune " + esc(k.kommune) : ""}</div>
       ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Kulturminnesøk</a>` : ""}</div>`;
   }).join("");
-  if(list.length > max)
-    h += `<button class="more" data-more="${list.length}">Vis alle ${list.length} …</button>`;
   return h;
 }
 async function loadKultur(lat, lon){
   const dLat = 1050 / 110540;
   const dLon = 1050 / (111320 * Math.cos(lat * Math.PI / 180));
   const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(x => x.toFixed(6)).join(",");
-  const d = await getJson(`${API.kultur}?f=json&limit=${LIMIT}&bbox=${bbox}`);
-  const feats = d.features || [];
+  // API-et tar med oppføringer uten geometri fra hele landet, så vi avgrenser til kommunene rundt (også kommuner 1 km unna)
+  const dl = 1000 / 110540, dn = 1000 / (111320 * Math.cos(lat * Math.PI / 180));
+  const punkter = [[lat, lon], [lat + dl, lon], [lat - dl, lon], [lat, lon + dn], [lat, lon - dn]];
+  const knr = await Promise.all(punkter.map(p =>
+    getJson(`${API.kommune}?nord=${p[0]}&ost=${p[1]}&koordsys=4258`).then(k => k.kommunenummer).catch(() => null)));
+  const kommuner = [...new Set(knr.filter(Boolean))];
+  if(!kommuner.length) throw new Error("fant ikke kommune");
+  const hent = async kn => {
+    const url = `${API.kultur}?f=json&limit=${LIMIT}&bbox=${bbox}&kommune=${kn}`;
+    const first = await getJson(url, 40000);
+    let fl = first.features || [];
+    const total = Math.min(first.numberMatched || 0, 4 * LIMIT);
+    const rest = [];
+    for(let off = LIMIT; off < total; off += LIMIT) rest.push(getJson(`${url}&offset=${off}`, 40000));
+    (await Promise.all(rest)).forEach(r => { fl = fl.concat(r.features || []); });
+    return fl;
+  };
+  const feats = [].concat(...await Promise.all(kommuner.map(hent)));
+  const seen = new Set();
   const all = feats.map(f => {
     const p = f.properties || {};
     return {
-      navn: p.navn, d: geomDist(f.geometry, lat, lon), pt: nearestPt(f.geometry, lat, lon),
+      id: p.lokalId || f.id, navn: p.navn, d: geomDist(f.geometry, lat, lon), pt: nearestPt(f.geometry, lat, lon),
       vern: p.verneparagraf || p.vernetype || p.lokalitetsart,
       kommune: p.kommune, link: p["linkKulturminnesøk"]
     };
-  }).filter(k => isFinite(k.d) && k.d <= 1000).sort((a, b) => a.d - b.d);
+  }).filter(k => isFinite(k.d) && k.d <= 1000 && !seen.has(k.id) && seen.add(k.id))
+    .sort((a, b) => a.d - b.d).slice(0, 50); // bare de 50 nærmeste
 
   const t100 = all.filter(k => k.d <= 100);
   const t1000 = all.filter(k => k.d > 100);
 
-  const tierHtml = (list, max, id) => list.length
-    ? `<div id="${id}">${kulturItems(list, max)}</div>`
+  const tierHtml = list => list.length
+    ? kulturItems(list, list.length)
     : `<div class="muted">Ingen registrerte kulturminner.</div>`;
-  let h = `<div class="tier">Innen 100 m (${t100.length})</div>` + tierHtml(t100, 20, "k100");
-  h += `<div class="tier">100 m til 1 km (${t1000.length})</div>` + tierHtml(t1000, 15, "k1000");
-  if(feats.length >= LIMIT)
-    h += `<div class="warn">Området har mange treff \u2013 bare de første ${LIMIT} ble hentet, så listen kan være ufullstendig.</div>`;
-  h += `<div class="muted" style="margin-top:8px">Avstand er til nærmeste punkt/kant av kulturminnet. Kulturminner med begrenset offentlighet vises ikke.</div>`;
+  let h = `<div class="tier">Innen 100 m (${t100.length})</div>` + tierHtml(t100);
+  h += `<div class="tier">100 m til 1 km (${t1000.length})</div>` + tierHtml(t1000);
+  h += `<div class="muted" style="margin-top:8px">Viser de 50 nærmeste innen 1 km. Avstand er til nærmeste punkt/kant av kulturminnet. Kulturminner med begrenset offentlighet vises ikke.</div>`;
   setCard("kultur", h);
   kartListe.kultur = all;
   setTreff("kultur", all.length > 0);
-  const lists = {k100: t100, k1000: t1000};
-  document.querySelectorAll("#c-kultur .more").forEach(b => b.addEventListener("click", () => {
-    const box = b.parentElement;
-    box.innerHTML = kulturItems(lists[box.id], lists[box.id].length);
-  }));
 }
 
 /* ---------- kart (Leaflet) ---------- */
@@ -437,18 +445,13 @@ const KART_LAG = {
     url: "https://kart.ra.no/wms/kulturminner2",
     layers: "Kulturminner", z: 6, opacity: 0.9, on: true,
     attr: "Kulturminner © Riksantikvaren"
-  },
-  tur: {
-    url: "https://wms.geonorge.no/skwms1/wms.friluftsruter2",
-    layers: "Fotrute", z: 7, opacity: 1, on: true,
-    attr: "Turruter © Kartverket m.fl."
   }
 };
 const KART_PREF = "stedsinfo-kart";
 let map = null, kartPos = null, posLayers = [];
 const kartLag = {};
 // Treff per kartlag (null = ikke sjekket ennå). Lag uten treff skjules.
-const kartTreff = {kultur: null, vern: null, reservat: null, tur: null};
+const kartTreff = {kultur: null, vern: null, reservat: null};
 function updateKartValg(){
   let any = false;
   document.querySelectorAll("#kart-valg label").forEach(l => {
@@ -468,7 +471,7 @@ function setTreff(k, v){ kartTreff[k] = v; updateKartValg(); }
 
 /* ---------- liste over treff (sortert på avstand) ---------- */
 const kartListe = {kultur: [], vern: []};
-let kartListeOpen = false, kartListeN = 30, kartListeVis = [], kartMark = null;
+let kartListeOpen = false, kartListeN = 5, kartListeVis = [], kartMark = null;
 function renderListe(){
   const box = $("#kart-liste");
   box.hidden = !kartListeOpen;
@@ -502,38 +505,14 @@ function visPaaKart(x){
 $("#kart-liste-btn").addEventListener("click", () => {
   kartListeOpen = !kartListeOpen;
   $("#kart-liste-btn").textContent = kartListeOpen ? "Skjul liste" : "Vis liste";
-  kartListeN = 30;
+  kartListeN = 5;
   renderListe();
 });
 $("#kart-liste").addEventListener("click", e => {
   const p = e.target.closest(".pick"), m = e.target.closest("#liste-mer");
-  if(m){ kartListeN += 30; renderListe(); }
+  if(m){ kartListeN += 10; renderListe(); }
   else if(p) visPaaKart(kartListeVis[+p.dataset.i]);
 });
-function lonLatTo3857(lon, lat){
-  return [lon * 20037508.34 / 180, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * 6378137];
-}
-// Sjekker om turrutelaget har noe innen ca. 1 km ved å hente et lite kartbilde og se etter piksler
-async function sjekkTur(lat, lon){
-  const [x, y] = lonLatTo3857(lon, lat), r = 1000 / Math.cos(lat * Math.PI / 180), S = 160;
-  const url = `${KART_LAG.tur.url}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${KART_LAG.tur.layers}&STYLES=&CRS=EPSG:3857` +
-    `&BBOX=${x - r},${y - r},${x + r},${y + r}&WIDTH=${S}&HEIGHT=${S}&FORMAT=image/png&TRANSPARENT=true`;
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error("HTTP " + resp.status);
-  const bmp = await createImageBitmap(await resp.blob());
-  const cv = document.createElement("canvas");
-  cv.width = cv.height = S;
-  const ctx = cv.getContext("2d");
-  ctx.drawImage(bmp, 0, 0);
-  const px = ctx.getImageData(0, 0, S, S).data;
-  const c = S / 2;
-  for(let i = 3; i < px.length; i += 4){
-    const k = (i - 3) / 4;
-    if(px[i] > 0 && Math.hypot(k % S - c, Math.floor(k / S) - c) <= c) return true; // bare innen 1 km-sirkelen
-  }
-  return false;
-}
-
 function kartPrefs(){
   try{ return JSON.parse(localStorage.getItem(KART_PREF) || "{}"); } catch(e){ return {}; }
 }
@@ -635,8 +614,7 @@ async function runAll(lat, lon, acc, fraAdresse){
   const jobs = [
     loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
     loadNatur(lat, lon).catch(e => { setCard("natur", errHtml(e)); setTreff("vern", true); setTreff("reservat", true); }),
-    loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
-    sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true))
+    loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); })
   ];
   await Promise.all(jobs);
   if(acc && acc > 50){
