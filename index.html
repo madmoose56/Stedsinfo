@@ -363,7 +363,7 @@ async function loadNatur(lat, lon){
     return {navn: v.offisieltNavn || v.navn || "(uten navn)", art: v.verneform || "",
       d: seenIn.has(key(v)) ? 0 : info.d, pt: info.pt, bounds: info.bounds, link: safeUrl(v.faktaark),
       type: /reservat/i.test(v.verneform || "") ? "reservat" : "vern"};
-  }).filter(x => isFinite(x.d));
+  }).filter(x => x.d <= 1000);
   setTreff("vern", n1000.length > 0);
   setTreff("reservat", n1000.some(v => /reservat/i.test(v.verneform || "")));
 }
@@ -526,7 +526,11 @@ async function sjekkTur(lat, lon){
   const ctx = cv.getContext("2d");
   ctx.drawImage(bmp, 0, 0);
   const px = ctx.getImageData(0, 0, S, S).data;
-  for(let i = 3; i < px.length; i += 4) if(px[i] > 0) return true;
+  const c = S / 2;
+  for(let i = 3; i < px.length; i += 4){
+    const k = (i - 3) / 4;
+    if(px[i] > 0 && Math.hypot(k % S - c, Math.floor(k / S) - c) <= c) return true; // bare innen 1 km-sirkelen
+  }
   return false;
 }
 
