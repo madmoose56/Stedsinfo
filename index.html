@@ -99,7 +99,7 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .kart-fullbtn{background:#fff;color:#14532d;border:2px solid rgba(0,0,0,.3);border-radius:8px;padding:4px 8px;
   font:700 12px/1.15 -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;
   box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
-.kart-hjorne{display:flex;align-items:flex-end;gap:6px}
+.kart-hjorne{display:flex;align-items:flex-end;justify-content:space-between;gap:6px}
 body.kartfull .kart-hjorne{display:none}
 .kart-radius-box{display:flex;flex-direction:column;gap:6px}
 .seg{display:flex;margin:4px 0 12px;border:1px solid var(--accent);border-radius:12px;overflow:hidden}
@@ -676,6 +676,10 @@ function initMap(){
     onAdd(){
       const rad = L.DomUtil.create("div", "kart-hjorne");
       L.DomEvent.disableClickPropagation(rad);
+      // raden går over hele kartbredden: bunnkart-valg til venstre, «full størrelse» til høyre
+      const bredde = () => { rad.style.width = Math.max(120, map.getSize().x - 20) + "px"; };
+      bredde();
+      map.on("resize", bredde);
       const box = L.DomUtil.create("div", "kart-base-box", rad);
       [["kart", "Topo"], ["flyfoto", "Flyfoto"], ["bygg", "Bygninger"]].forEach(([k, navn]) => {
         const b = L.DomUtil.create("button", "kart-base" + (k === kartBaseNavn ? " on" : ""), box);
