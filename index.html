@@ -59,9 +59,18 @@ a{color:var(--accent)}
 .links.rad a{flex:1;min-width:0;margin:4px 0;padding:8px 4px;display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap}
 .links a .op{width:22px;height:22px;vertical-align:middle;margin:0 6px 0 0;flex:none}
 .kbadge{display:inline-block;background:#c2410c;color:#fff;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700}
-.smark{display:block;width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;background:#fff;
+.mlab{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:4px;pointer-events:none;
+  font:600 11px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;color:#1c1f1a;white-space:nowrap;
+  text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 4px #fff}
+#map.nolab .mlab{display:none}
+.kart-base-box{display:flex;background:#fff;border:2px solid rgba(0,0,0,.3);border-radius:8px;overflow:hidden;
+  box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.kart-base{border:0;background:#fff;color:#14532d;padding:6px 8px;font:700 12px/1.1 -apple-system,BlinkMacSystemFont,sans-serif}
+.kart-base+.kart-base{border-left:1px solid rgba(0,0,0,.2)}
+.kart-base.on{background:#14532d;color:#fff}
+.smark{position:relative;display:block;width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;background:#fff;
   border:2px solid #b45309;text-align:center;font-size:15px;line-height:22px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
-.kmark{display:block;width:max-content;transform:translate(-50%,-50%);background:#c2410c;color:#fff;border:2px solid #fff;border-radius:10px;
+.kmark{position:relative;display:block;width:max-content;transform:translate(-50%,-50%);background:#c2410c;color:#fff;border:2px solid #fff;border-radius:10px;
   padding:3px 6px;font:700 12px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;
   box-shadow:0 1px 4px rgba(0,0,0,.4)}
 #e-full{position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:var(--bg)}
@@ -472,7 +481,8 @@ const KART_LAG = {
     attr: "Kulturminner © Riksantikvaren"
   }
 };
-const KART_PREF = "stedsinfo-kart";
+const KART_PREF = "stedsinfo-kart", KART_BASE = "stedsinfo-bunnkart";
+let kartBase = null, kartBaseNavn = "kart";
 let map = null, kartPos = null, posLayers = [];
 const kartLag = {};
 // Treff per kartlag (null = ikke sjekket ennå). Lag uten treff skjules.
@@ -533,7 +543,7 @@ function drawSpiseMarks(){
   kartLag.spise.clearLayers();
   kartListe.spise.forEach(x => {
     if(x.d > kartRadius) return;
-    kartLag.spise.addLayer(L.marker(x.pt, {icon: L.divIcon({className: "", html: '<div class="smark">🍴</div>', iconSize: [0, 0]})})
+    kartLag.spise.addLayer(L.marker(x.pt, {icon: L.divIcon({className: "", html: `<div class="smark">🍴${x.navn ? `<span class="mlab">${esc(kort(x.navn))}</span>` : ""}</div>`, iconSize: [0, 0]})})
       .bindPopup(`<b>${esc(x.navn || x.art)}</b><br>${esc(x.navn ? x.art : "")}${x.mat ? " · " + esc(x.mat.replace(/;/g, ", ")) : ""}<br>${fmtDist(x.d)}`));
   });
 }
@@ -563,6 +573,7 @@ function drawVernPolys(){
 // treff som brukes til K1, K2 … på kartet
 const kartListe = {kultur: [], vern: [], spise: []};
 let kartK = null;
+function kort(t){ return t.length > 22 ? t.slice(0, 21) + "…" : t; }
 function drawKultMarks(){
   if(!map) return;
   if(!kartK) kartK = L.layerGroup().addTo(map);
@@ -570,7 +581,7 @@ function drawKultMarks(){
   if(kartTreff.kultur !== true || !$('#kart-valg input[data-layer="kultur"]').checked) return;
   kartListe.kultur.forEach(k => {
     if(!k.pt || k.d > kartRadius) return;
-    kartK.addLayer(L.marker(k.pt, {icon: L.divIcon({className: "", html: `<div class="kmark">K${k.nr}</div>`, iconSize: [0, 0]})})
+    kartK.addLayer(L.marker(k.pt, {icon: L.divIcon({className: "", html: `<div class="kmark">K${k.nr}${k.navn ? `<span class="mlab">${esc(kort(k.navn))}</span>` : ""}</div>`, iconSize: [0, 0]})})
       .bindPopup(`<b>K${k.nr} ${esc(k.navn || "(uten navn)")}</b><br>${fmtDist(k.d)}`));
   });
 }
@@ -612,10 +623,26 @@ function initMap(){
     $("#kart-info").textContent = "Kartbiblioteket kunne ikke lastes. Sjekk nettforbindelsen og last siden på nytt.";
     return false;
   }
-  map = L.map("map", {zoomSnap: 0.25});
-  L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png", {
-    maxZoom: 18, attribution: 'Kartgrunnlag © <a href="https://www.kartverket.no" target="_blank" rel="noopener">Kartverket</a>'
-  }).addTo(map);
+  map = L.map("map", {zoomSnap: 0.25, maxZoom: 19});
+  const KV = 'Kartgrunnlag © <a href="https://www.kartverket.no" target="_blank" rel="noopener">Kartverket</a>';
+  kartBase = {
+    kart: L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png",
+      {maxZoom: 19, maxNativeZoom: 18, attribution: KV}),
+    flyfoto: L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      {maxZoom: 19, maxNativeZoom: 19, attribution: "Flyfoto © Esri, Maxar, Earthstar Geographics"}),
+    bygg: L.layerGroup([
+      L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topograatone/default/webmercator/{z}/{y}/{x}.png",
+        {maxZoom: 19, maxNativeZoom: 18, attribution: KV}),
+      L.tileLayer.wms("https://wms.geonorge.no/skwms1/wms.matrikkelkart", {
+        layers: "bygninger", format: "image/png", transparent: true, version: "1.3.0", zIndex: 3,
+        attribution: "Bygninger © Kartverket (matrikkelen)"})
+    ])
+  };
+  let valgtBase = "kart";
+  try{ valgtBase = localStorage.getItem(KART_BASE) || "kart"; } catch(e){}
+  if(!kartBase[valgtBase]) valgtBase = "kart";
+  kartBase[valgtBase].addTo(map);
+  kartBaseNavn = valgtBase;
   const prefs = kartPrefs();
   document.querySelectorAll("#kart-valg input").forEach(box => {
     const key = box.dataset.layer, def = KART_LAG[key];
@@ -652,6 +679,34 @@ function initMap(){
     }
   });
   map.addControl(new FullCtl());
+  // bytte av bunnkart: Kart / Flyfoto (satellitt) / Bygninger (tydelige bygninger i tettbygde strøk)
+  const BaseCtl = L.Control.extend({
+    options: {position: "topleft"},
+    onAdd(){
+      const box = L.DomUtil.create("div", "kart-base-box");
+      L.DomEvent.disableClickPropagation(box);
+      [["kart", "Kart"], ["flyfoto", "Flyfoto"], ["bygg", "Bygninger"]].forEach(([k, navn]) => {
+        const b = L.DomUtil.create("button", "kart-base" + (k === kartBaseNavn ? " on" : ""), box);
+        b.type = "button";
+        b.textContent = navn;
+        L.DomEvent.on(b, "click", () => {
+          if(k === kartBaseNavn) return;
+          map.removeLayer(kartBase[kartBaseNavn]);
+          kartBase[k].addTo(map);
+          if(kartBase[k].bringToBack) kartBase[k].bringToBack();
+          kartBaseNavn = k;
+          box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+          try{ localStorage.setItem(KART_BASE, k); } catch(e){}
+        });
+      });
+      return box;
+    }
+  });
+  map.addControl(new BaseCtl());
+  // navn ved markørene vises bare når kartet er zoomet nok inn
+  const toggleLab = () => $("#map").classList.toggle("nolab", map.getZoom() < 16);
+  map.on("zoomend", toggleLab);
+  toggleLab();
   return true;
 }
 function drawKart(){
