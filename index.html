@@ -657,7 +657,7 @@ $("#kart-close").addEventListener("click", () => kartFull(false));
 let eiendomInfo = null, emap = null, eRadius = 100, eLayers = [], eBtns = null;
 function openEiendomKart(){
   if(!eiendomInfo || typeof L === "undefined") return;
-  eRadius = kartRadius; // samme radius som kartet nederst
+  eRadius = 100; // eiendomskartet åpnes alltid på 100 m
   $("#e-full").hidden = false;
   document.body.classList.add("efull");
   if(!emap){
