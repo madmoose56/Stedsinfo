@@ -59,6 +59,8 @@ a{color:var(--accent)}
 .links.rad a{flex:1;min-width:0;margin:4px 0;padding:8px 4px;display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap}
 .links a .op{width:22px;height:22px;vertical-align:middle;margin:0 6px 0 0;flex:none}
 .kbadge{display:inline-block;background:#c2410c;color:#fff;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700}
+.smark{display:block;width:26px;height:26px;transform:translate(-50%,-50%);border-radius:50%;background:#fff;
+  border:2px solid #b45309;text-align:center;font-size:15px;line-height:22px;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .kmark{display:block;width:max-content;transform:translate(-50%,-50%);background:#c2410c;color:#fff;border:2px solid #fff;border-radius:10px;
   padding:3px 6px;font:700 12px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;
   box-shadow:0 1px 4px rgba(0,0,0,.4)}
@@ -154,6 +156,7 @@ body.kartfull .kart-fullbtn{display:none}
       <label><input type="checkbox" data-layer="vern"> Verneområde</label>
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
       <label><input type="checkbox" data-layer="tur"> Turstier</label>
+      <label><input type="checkbox" data-layer="spise"> Spisesteder</label>
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
     <button type="button" id="kart-close">‹ Tilbake</button>
@@ -162,7 +165,7 @@ body.kartfull .kart-fullbtn{display:none}
 
   <footer>
     Kilder: Kartverket (adresser, kommuneinfo, kart og matrikkelkart), Miljødirektoratet (Naturbase verneområder),
-    Riksantikvaren (Askeladden/Kulturminnesøk). Data er veiledende, ikke juridisk bindende.
+    Riksantikvaren (Askeladden/Kulturminnesøk), OpenStreetMap (spisesteder). Data er veiledende, ikke juridisk bindende.
     Tips: legg til <code>#59.9139,10.7522</code> i adressen for å teste en annen posisjon.
   </footer>
 </main>
@@ -457,6 +460,7 @@ let kartAcc = 0, kartBtn = null, kartFraAdresse = false;
 const KART_LAG = {
   vern: {on: true},      // tegnes som skravert polygon fra Miljødirektoratets data (se drawVernPolys)
   reservat: {on: true},
+  spise: {on: false},    // markører fra OpenStreetMap (se loadSpise)
   tur: {
     url: "https://wms.geonorge.no/skwms1/wms.friluftsruter2",
     layers: "Fotrute", z: 7, opacity: 1, on: true,
@@ -472,7 +476,7 @@ const KART_PREF = "stedsinfo-kart";
 let map = null, kartPos = null, posLayers = [];
 const kartLag = {};
 // Treff per kartlag (null = ikke sjekket ennå). Lag uten treff skjules.
-const kartTreff = {kultur: null, vern: null, reservat: null, tur: null};
+const kartTreff = {kultur: null, vern: null, reservat: null, tur: null, spise: null};
 function updateKartValg(){
   let any = false;
   document.querySelectorAll("#kart-valg label").forEach(l => {
@@ -487,8 +491,52 @@ function updateKartValg(){
   });
   $("#kart-valg").hidden = !any;
   drawKultMarks();
+  drawSpiseMarks();
 }
 // K1, K2 … på kartet. Vises bare når Kulturminner er avkrysset og treffet er innenfor valgt radius.
+/* ---------- spisesteder (OpenStreetMap / Overpass) ---------- */
+const OVERPASS = ["https://overpass.openstreetmap.fr/api/interpreter", "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"];
+const SPISE_TYPE = {restaurant: "Restaurant", cafe: "Kafé", fast_food: "Hurtigmat", food_court: "Matcourt"};
+async function overpass(q){
+  // «hedged»: neste server starter etter 5 s hvis den forrige ikke har svart
+  const prov = (url, delay) => new Promise((ok, fail) => {
+    setTimeout(async () => {
+      try{
+        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 30000);
+        const r = await fetch(url, {method: "POST", signal: ctl.signal,
+          headers: {"Content-Type": "application/x-www-form-urlencoded"}, body: "data=" + encodeURIComponent(q)});
+        clearTimeout(t);
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        ok(await r.json());
+      } catch(e){ fail(e); }
+    }, delay);
+  });
+  return Promise.any(OVERPASS.map((u, i) => prov(u, i * 5000)));
+}
+async function loadSpise(lat, lon){
+  const q = `[out:json][timeout:25];nwr["amenity"~"^(restaurant|cafe|fast_food|food_court)$"](around:1000,${lat},${lon});out center tags 300;`;
+  const d = await overpass(q);
+  const seen = new Set();
+  kartListe.spise = (d.elements || []).map(e => {
+    const la = e.lat != null ? e.lat : e.center && e.center.lat, lo = e.lon != null ? e.lon : e.center && e.center.lon;
+    if(la == null || lo == null) return null;
+    const t = e.tags || {}, p = proj(lo, la, lon, lat);
+    return {id: e.type + e.id, navn: t.name || "", art: SPISE_TYPE[t.amenity] || "Spisested", mat: t.cuisine || "",
+      d: Math.hypot(p[0], p[1]), pt: [la, lo]};
+  }).filter(x => x && x.d <= 1000 && !seen.has(x.id) && seen.add(x.id))
+    .sort((a, b) => a.d - b.d).slice(0, 60);
+  setTreff("spise", kartListe.spise.length > 0);
+}
+function drawSpiseMarks(){
+  if(!map || !kartLag.spise) return;
+  kartLag.spise.clearLayers();
+  kartListe.spise.forEach(x => {
+    if(x.d > kartRadius) return;
+    kartLag.spise.addLayer(L.marker(x.pt, {icon: L.divIcon({className: "", html: '<div class="smark">🍴</div>', iconSize: [0, 0]})})
+      .bindPopup(`<b>${esc(x.navn || x.art)}</b><br>${esc(x.navn ? x.art : "")}${x.mat ? " · " + esc(x.mat.replace(/;/g, ", ")) : ""}<br>${fmtDist(x.d)}`));
+  });
+}
 // skravering av verneområder (grønn) og naturreservat (lilla)
 let hatchRenderer = null;
 const HATCH = {vern: {id: "hatch-vern", farge: "#15803d"}, reservat: {id: "hatch-reservat", farge: "#7e22ce"}};
@@ -513,7 +561,7 @@ function drawVernPolys(){
   });
 }
 // treff som brukes til K1, K2 … på kartet
-const kartListe = {kultur: [], vern: []};
+const kartListe = {kultur: [], vern: [], spise: []};
 let kartK = null;
 function drawKultMarks(){
   if(!map) return;
@@ -633,6 +681,7 @@ function drawKart(){
   $("#kart-info").hidden = kartFraAdresse;
   $("#kart-info").textContent = "Blå prikk er posisjonen din. Stiplet ring viser radius " + rad + ".";
   drawKultMarks();
+  drawSpiseMarks();
 }
 function showKart(lat, lon, acc){
   if(!initMap()) return;
@@ -712,7 +761,7 @@ async function runAll(lat, lon, acc, fraAdresse){
   $("#pos").textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}` + (acc ? ` · ±${Math.round(acc)} m` : "");
   loading();
   Object.keys(kartTreff).forEach(k => { kartTreff[k] = null; });
-  kartListe.kultur = []; kartListe.vern = [];
+  kartListe.kultur = []; kartListe.vern = []; kartListe.spise = [];
   updateKartValg();
   loadMobil();
   showKart(lat, lon, acc);
@@ -720,7 +769,8 @@ async function runAll(lat, lon, acc, fraAdresse){
     loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
     loadNatur(lat, lon).catch(e => { setCard("natur", errHtml(e)); setTreff("vern", true); setTreff("reservat", true); }),
     loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
-    sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true))
+    sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true)),
+    loadSpise(lat, lon).catch(() => setTreff("spise", false))
   ];
   await Promise.all(jobs);
   if(acc && acc > 50){

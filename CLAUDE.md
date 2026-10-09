@@ -9,10 +9,11 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v33).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v34).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Kart
+- Valget «Spisesteder» (av som standard): restauranter, kafeer og hurtigmat innen 1 km fra OpenStreetMap via Overpass (hedged mellom flere servere), vist som gaffel/kniv-markører innenfor valgt radius. Skjules hvis ingen treff eller hvis Overpass ikke svarer.
 - «Åpne eiendomskart» i Eiendom-kortet åpner et eget fullskjermkart (matrikkelkart med teiger og gnr/bnr-tall, info nede til venstre, «‹ Tilbake»). Åpnes alltid på 100 m, med de to andre radiusene (500 m, 1 km) som knapper.
 - Kartverket topo som bunn. Lag med avkrysning: kulturminner, verneområde, naturreservat, turstier (Kartverkets friluftsruter, laget «Fotrute»; vanlig WMS-lag; rød stiplet versjon ble prøvd og fjernet igjen). Lag uten treff innen 1 km skjules.
 - Kulturminner: de 50 nærmeste innen 1 km hentes; kortet viser 3 + «Vis flere». Hvert treff har nummer K1, K2 … (etter avstand), vist i kortet, i kartlisten og som merke på kartet (bare når laget er avkrysset og treffet er innenfor valgt radius). Kartradius 100 m / 500 m / 1 km: to knapper øverst til høyre på kartet viser de to radiusene som ikke er valgt. Riksantikvarens API (api.ra.no) tar med oppføringer uten geometri fra hele landet, så spørringen må avgrenses med `kommune=` (kommunene rundt posisjonen) i tillegg til `bbox`.
