@@ -9,10 +9,11 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v40).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v41).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Kart
+- Fullskjerm av nederste kart åpnes alltid på radius 50 m, med valgene 50 m / 500 m / 1 km (vanlig visning: 100 m / 500 m / 1 km). Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
 - Bunnkart-bytte (knapper nede til venstre, på samme linje som «full størrelse» som står til høyre): Topo (Kartverket topo), Flyfoto (Esri World Imagery; Kartverkets Norge-i-bilder-adresse virket ikke) og Bygninger (Kartverket gråtone + matrikkelens bygningslag). Valget huskes. Navn vises ved K-merkene og spisestedene når zoom ≥ 16.
 - Valget «Spisesteder» (av som standard): restauranter, kafeer og hurtigmat innen 1 km fra OpenStreetMap via Overpass (hedged mellom flere servere), vist som gaffel/kniv-markører innenfor valgt radius. Skjules hvis ingen treff eller hvis Overpass ikke svarer.
 - «Åpne eiendomskart» i Eiendom-kortet åpner et eget fullskjermkart (matrikkelkart med teiger og gnr/bnr-tall, info nede til venstre, «‹ Tilbake»). Åpnes alltid på 100 m, med de to andre radiusene (500 m, 1 km) som knapper.
