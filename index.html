@@ -128,15 +128,14 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
   <section class="card" id="c-kart">
     <h2>Kart</h2>
     <div class="toggles" id="kart-valg">
-      <label><input type="checkbox" data-layer="eiendom"> Eiendomsgrenser</label>
+      <label><input type="checkbox" data-layer="kultur"> Kulturminner</label>
       <label><input type="checkbox" data-layer="vern"> Verneområde</label>
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
+      <label><input type="checkbox" data-layer="tur"> Turstier</label>
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
     <button type="button" class="more" id="kart-full">Åpne i full størrelse ↗</button>
     <button type="button" id="kart-close">‹ Tilbake</button>
-    <div class="warn" id="kart-hint" hidden>Eiendomsgrenser vises først når du zoomer litt inn.
-      <button class="more" id="kart-zoom" type="button">Zoom inn</button></div>
     <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplet ring viser radius 100 m.</div>
   </section>
 
@@ -278,7 +277,6 @@ async function loadSted(lat, lon){
   } else {
     e += `<div class="muted">Fant ikke gnr/bnr – ingen adresse nær nok.</div>`;
   }
-  e += `<div class="links" style="margin-top:8px"><button type="button" data-act="eiendom-kart">Matrikkel – eiendomskart Teig (GeoNorge)</button></div>`;
   setCard("eiendom", e);
 
   // Eier
@@ -395,20 +393,24 @@ const KART_LAG = {
   },
   reservat: {
     url: "https://kart.miljodirektoratet.no/arcgis/services/vern_hovedtyper/MapServer/WMSServer",
-    layers: "naturvern_naturreservat_omrade", z: 5, opacity: 0.65, on: false,
+    layers: "naturvern_naturreservat_omrade", z: 5, opacity: 0.65, on: true,
     attr: "Naturreservat © Miljødirektoratet"
   },
-  eiendom: {
-    url: "https://wms.geonorge.no/skwms1/wms.matrikkelkart",
-    layers: "teiger", z: 6, opacity: 1, on: false,
-    attr: "Matrikkelkart © Kartverket"
+  kultur: {
+    url: "https://kart.ra.no/wms/kulturminner2",
+    layers: "Kulturminner", z: 6, opacity: 0.9, on: true,
+    attr: "Kulturminner © Riksantikvaren"
+  },
+  tur: {
+    url: "https://wms.geonorge.no/skwms1/wms.friluftsruter2",
+    layers: "Fotrute", z: 7, opacity: 1, on: true,
+    attr: "Turruter © Kartverket m.fl."
   }
 };
 const KART_PREF = "stedsinfo-kart";
 let map = null, kartPos = null, posLayers = [];
 const kartLag = {};
 
-function mppAt(z, lat){ return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z); }
 function kartPrefs(){
   try{ return JSON.parse(localStorage.getItem(KART_PREF) || "{}"); } catch(e){ return {}; }
 }
@@ -416,12 +418,6 @@ function saveKartPrefs(){
   const p = {};
   document.querySelectorAll("#kart-valg input").forEach(i => { p[i.dataset.layer] = i.checked; });
   try{ localStorage.setItem(KART_PREF, JSON.stringify(p)); } catch(e){}
-}
-function updateKartHint(){
-  if(!map || !kartPos) return;
-  const on = $('#kart-valg input[data-layer="eiendom"]').checked;
-  // eiendomsgrenser tegnes av tjenesten først fra ca. 1:40 000 (≈ 11 m per piksel)
-  $("#kart-hint").hidden = !(on && mppAt(map.getZoom(), kartPos[0]) > 11.2);
 }
 function initMap(){
   if(map) return true;
@@ -444,11 +440,9 @@ function initMap(){
     if(box.checked) kartLag[key].addTo(map);
     box.addEventListener("change", () => {
       if(box.checked) kartLag[key].addTo(map); else kartLag[key].remove();
-      saveKartPrefs(); updateKartHint();
+      saveKartPrefs();
     });
   });
-  map.on("zoomend", updateKartHint);
-  $("#kart-zoom").addEventListener("click", () => { if(kartPos) map.setView(kartPos, 14); });
 
   // liten knapp øverst til høyre som bytter mellom 100 m og 1 km radius
   const RadiusCtl = L.Control.extend({
@@ -485,7 +479,6 @@ function drawKart(){
   }
   $("#kart-info").hidden = kartFraAdresse;
   $("#kart-info").textContent = "Blå prikk er posisjonen din. Stiplet ring viser radius " + (kartRadius === 100 ? "100 m" : "1 km") + ".";
-  updateKartHint();
 }
 function showKart(lat, lon, acc){
   if(!initMap()) return;
@@ -504,13 +497,6 @@ function kartFull(on){
 }
 $("#kart-full").addEventListener("click", () => kartFull(true));
 $("#kart-close").addEventListener("click", () => kartFull(false));
-document.addEventListener("click", ev => {
-  if(!ev.target.closest('[data-act="eiendom-kart"]') || !map || !kartPos) return;
-  const cb = $('#kart-valg input[data-layer="eiendom"]');
-  if(!cb.checked){ cb.checked = true; cb.dispatchEvent(new Event("change")); }
-  kartFull(true);
-  map.setView(kartPos, 17, {animate: false});
-});
 
 /* ---------- hovedflyt ---------- */
 function loading(){
