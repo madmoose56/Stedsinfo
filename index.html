@@ -440,7 +440,7 @@ async function loadKultur(lat, lon){
   all.forEach((k, i) => { k.nr = i + 1; });
   const forste = all.slice(0, 3), resten = all.slice(3);
   let h = all.length
-    ? `<div class="muted">${all.length} nærmeste kulturminner innen 1 km. Merket K1, K2 … på kartet.</div>` + kulturItems(forste) +
+    ? `<div class="muted">Nærmeste kulturminner - innen 1 km</div>` + kulturItems(forste) +
       (resten.length ? `<div id="k-rest" hidden>${kulturItems(resten)}</div><button type="button" class="more" id="k-mer">Vis flere (${resten.length})</button>` : "")
     : `<div class="muted">Ingen registrerte kulturminner.</div>`;
   h += `<div class="muted" style="margin-top:8px">Avstand er til nærmeste punkt/kant av kulturminnet. Kulturminner med begrenset offentlighet vises ikke.</div>`;
