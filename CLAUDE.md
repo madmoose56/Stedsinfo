@@ -4,12 +4,12 @@ Svar alltid på norsk (bokmål). Eieren, Stein Arne, skriver norsk og er ikke ut
 
 ## Hva appen er
 Personlig iPhone-PWA «Stedsinfo». Viser info om posisjonen du står på (Norge): adresse, kommune, fylke, gnr/bnr (Kartverket), verneområder (Miljødirektoratet/Naturbase), kulturminner (Riksantikvaren/Askeladden), og lenker til dekningskart og «Se eiendom». Eier og signalstyrke finnes ikke som åpne data.
-Valget øverst: «Min posisjon» (GPS, til venstre, valgt automatisk ved oppstart) og «Velg adresse» (til høyre; søk på gate/nr/postnummer eller sted via Geonorge).
+Valget øverst: «Min posisjon» (GPS, til venstre, valgt automatisk ved oppstart) og «Velg adresse» (til høyre; søk på gate/nr/postnummer eller sted via Geonorge). De 10 siste valgte adressene lagres i localStorage (`stedsinfo-adresser`); skriver man første bokstav i Gate vises matchende forslag, og et trykk fyller Gate, Nr, Postnummer og Sted.
 Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting`, repo `madmoose56/Ruteinfo`).
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v35).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v36).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Kart

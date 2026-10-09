@@ -113,7 +113,9 @@ body.kartfull .kart-fullbtn{display:none}
 .frow.eller{align-items:flex-end}
 .frow .pnr{flex:0 0 36%}.frow .sted{flex:1;min-width:0}
 .ell{align-self:flex-end;margin-bottom:21px;color:var(--muted);font-size:14px}
-#adr-res .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
+#adr-sug{margin:-4px 0 10px}
+#adr-sug .muted{margin-bottom:2px}
+#adr-sug .pick,#adr-res .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
   border:1px solid var(--line);border-radius:10px;color:var(--text)}
 .toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .toggles label{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
@@ -141,6 +143,7 @@ body.kartfull .kart-fullbtn{display:none}
       <label class="f gate">Gate<input id="f-gate" type="text" autocapitalize="words" enterkeyhint="search" placeholder="f.eks. Karl Johans gate"></label>
       <label class="f nr">Nr<input id="f-nr" type="text" inputmode="text" autocapitalize="characters" placeholder="12B"></label>
     </div>
+    <div id="adr-sug" hidden></div>
     <div class="frow eller">
       <label class="f pnr">Postnummer<input id="f-pnr" type="text" inputmode="numeric" maxlength="4" placeholder="0154"></label>
       <span class="ell">eller</span>
@@ -863,9 +866,33 @@ function setMode(m){
   });
   if(m === "pos") start();
 }
+// siste adresser huskes i telefonen (bare lokalt)
+const ADR_HIST = "stedsinfo-adresser";
+function lesHist(){
+  try{ const h = JSON.parse(localStorage.getItem(ADR_HIST) || "[]"); return Array.isArray(h) ? h : []; } catch(e){ return []; }
+}
+function pen(t){ return String(t || "").toLowerCase().replace(/(^|[\s-])(\S)/g, (m, a, b) => a + b.toUpperCase()); }
+function lagreHist(a){
+  const nr = String(a.nummer != null ? a.nummer : "") + (a.bokstav || "");
+  const r = {gate: a.adressenavn || "", nr, pnr: a.postnummer || "", sted: pen(a.poststed),
+    tekst: `${a.adressetekst}, ${a.postnummer} ${pen(a.poststed)}`};
+  if(!r.gate) return;
+  const h = lesHist().filter(x => x.tekst !== r.tekst);
+  h.unshift(r);
+  try{ localStorage.setItem(ADR_HIST, JSON.stringify(h.slice(0, 10))); } catch(e){}
+}
+function visForslag(){
+  const box = $("#adr-sug"), v = $("#f-gate").value.trim().toLowerCase();
+  const tr = v ? lesHist().filter(r => r.gate.toLowerCase().startsWith(v) || r.tekst.toLowerCase().startsWith(v)).slice(0, 5) : [];
+  box.hidden = !tr.length;
+  box.innerHTML = tr.length ? `<div class="muted">Siste adresser:</div>` +
+    tr.map((r, i) => `<button type="button" class="pick" data-i="${i}">${esc(r.tekst)}</button>`).join("") : "";
+  box._tr = tr;
+}
 function pickAdresse(a){
   const p = a.representasjonspunkt;
   if(!p) return;
+  lagreHist(a);
   $("#adr-res").innerHTML = "";
   runAll(p.lat, p.lon, 0, true);
   $("#pos").textContent = `${a.adressetekst}, ${a.postnummer} ${a.poststed}`;
@@ -902,7 +929,15 @@ async function sokAdresse(ev){
   $("#adr-go").disabled = false;
 }
 $("#mode").addEventListener("click", e => { const b = e.target.closest("button"); if(b) setMode(b.dataset.mode); });
-$("#p-adr").addEventListener("submit", sokAdresse);
+$("#p-adr").addEventListener("submit", e => { $("#adr-sug").hidden = true; sokAdresse(e); });
+$("#f-gate").addEventListener("input", visForslag);
+$("#adr-sug").addEventListener("click", e => {
+  const b = e.target.closest(".pick");
+  if(!b) return;
+  const r = $("#adr-sug")._tr[+b.dataset.i];
+  $("#f-gate").value = r.gate; $("#f-nr").value = r.nr; $("#f-pnr").value = r.pnr; $("#f-sted").value = r.sted;
+  $("#adr-sug").hidden = true;
+});
 window.addEventListener("hashchange", () => { setMode("pos"); });
 if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(() => {}); }
 start();
