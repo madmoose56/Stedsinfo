@@ -62,6 +62,15 @@ a{color:var(--accent)}
 .kmark{display:block;width:max-content;transform:translate(-50%,-50%);background:#c2410c;color:#fff;border:2px solid #fff;border-radius:10px;
   padding:3px 6px;font:700 12px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;
   box-shadow:0 1px 4px rgba(0,0,0,.4)}
+#e-full{position:fixed;top:0;left:0;right:0;bottom:0;z-index:2000;background:var(--bg)}
+#emap{position:absolute;top:0;left:0;right:0;bottom:0;z-index:0;isolation:isolate}
+#e-close{position:absolute;z-index:1001;top:calc(env(safe-area-inset-top) + 10px);left:50%;transform:translateX(-50%);
+  background:#fff;color:#14532d;border:2px solid rgba(0,0,0,.3);border-radius:8px;padding:8px 14px;font-weight:700;
+  box-shadow:0 1px 4px rgba(0,0,0,.25)}
+#e-info{position:absolute;z-index:1001;left:10px;bottom:calc(env(safe-area-inset-bottom) + 28px);background:#fff;color:#14532d;
+  border:2px solid rgba(0,0,0,.3);border-radius:8px;padding:6px 10px;font:700 14px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);max-width:60%}
+body.efull{overflow:hidden}
 #kart-close{display:none}
 body.kartfull{overflow:hidden}
 body.kartfull #map{position:fixed;top:0;left:0;right:0;bottom:0;height:auto;z-index:1000;border-radius:0;border:0}
@@ -156,6 +165,12 @@ body.kartfull .kart-fullbtn{display:none}
     Tips: legg til <code>#59.9139,10.7522</code> i adressen for å teste en annen posisjon.
   </footer>
 </main>
+
+<div id="e-full" hidden>
+  <div id="emap" role="application" aria-label="Eiendomskart"></div>
+  <button type="button" id="e-close">‹ Tilbake</button>
+  <div id="e-info"></div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
@@ -288,7 +303,10 @@ async function loadSted(lat, lon){
   } else {
     e += `<div class="muted">Fant ikke gnr/bnr – ingen adresse nær nok.</div>`;
   }
+  eiendomInfo = {lat, lon, mat: matrikkel, gnr: a && a.gardsnummer, bnr: a && a.bruksnummer};
+  e += `<div class="links" style="margin-top:8px"><button type="button" id="e-open">Åpne eiendomskart</button></div>`;
   setCard("eiendom", e);
+  $("#e-open").addEventListener("click", openEiendomKart);
 
   // Eier
   setCard("eier", `
@@ -608,6 +626,56 @@ function kartFull(on){
   if(!on && kartFullView){ map.setView(kartFullView[0], kartFullView[1], {animate: false}); }
 }
 $("#kart-close").addEventListener("click", () => kartFull(false));
+
+/* ---------- eiendomskart i full størrelse ---------- */
+let eiendomInfo = null, emap = null, eRadius = 100, eLayers = [], eBtns = null;
+function openEiendomKart(){
+  if(!eiendomInfo || typeof L === "undefined") return;
+  eRadius = kartRadius; // samme radius som kartet nederst
+  $("#e-full").hidden = false;
+  document.body.classList.add("efull");
+  if(!emap){
+    emap = L.map("emap", {zoomSnap: 0.25});
+    L.tileLayer("https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png", {
+      maxZoom: 19, attribution: 'Kartgrunnlag © <a href="https://www.kartverket.no" target="_blank" rel="noopener">Kartverket</a>'
+    }).addTo(emap);
+    L.tileLayer.wms("https://wms.geonorge.no/skwms1/wms.matrikkelkart", {
+      layers: "teiger", format: "image/png", transparent: true, version: "1.3.0", zIndex: 6,
+      attribution: "Matrikkelkart © Kartverket"
+    }).addTo(emap);
+    const RCtl = L.Control.extend({
+      options: {position: "topright"},
+      onAdd(){ eBtns = L.DomUtil.create("div", "kart-radius-box"); L.DomEvent.disableClickPropagation(eBtns); return eBtns; }
+    });
+    emap.addControl(new RCtl());
+  }
+  drawEiendomKart();
+}
+function drawEiendomKart(){
+  const {lat, lon, mat, gnr, bnr} = eiendomInfo, pos = [lat, lon];
+  eLayers.forEach(l => l.remove());
+  eLayers = [
+    L.circle(pos, {radius: eRadius, color: "#14532d", weight: 2, dashArray: "6 6", fill: false}),
+    L.circleMarker(pos, {radius: 7, color: "#ffffff", weight: 2.5, fillColor: "#2563eb", fillOpacity: 1})
+  ];
+  eLayers.forEach(l => l.addTo(emap));
+  const dLat = eRadius / 110540, dLon = eRadius / (111320 * Math.cos(lat * Math.PI / 180));
+  emap.invalidateSize();
+  emap.fitBounds([[lat - dLat, lon - dLon], [lat + dLat, lon + dLon]], {animate: false, padding: [10, 10]});
+  eBtns.innerHTML = "";
+  [100, 500, 1000].filter(r => r !== eRadius).forEach(r => {
+    const b = L.DomUtil.create("button", "kart-radius", eBtns);
+    b.type = "button";
+    b.textContent = r === 1000 ? "1 km" : r + " m";
+    L.DomEvent.on(b, "click", () => { eRadius = r; drawEiendomKart(); });
+  });
+  $("#e-info").innerHTML = mat ? `Gnr ${esc(gnr)} · Bnr ${esc(bnr)}<br><span style="font-weight:600">Matrikkel ${esc(mat)}</span>`
+                               : "Ingen gnr/bnr for dette punktet";
+}
+$("#e-close").addEventListener("click", () => {
+  $("#e-full").hidden = true;
+  document.body.classList.remove("efull");
+});
 
 /* ---------- hovedflyt ---------- */
 function loading(){
