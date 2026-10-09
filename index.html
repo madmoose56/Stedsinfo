@@ -378,7 +378,7 @@ async function loadNatur(lat, lon){
     .map(v => Object.assign({}, v, {_d: info.get(key(v)).d}))
     .filter(v => v._d <= 1000).sort((x, y) => x._d - y._d);
 
-  let h = inn.length ? vernItems(inn.map(v => Object.assign({}, v, {_d: 0}))) : `<div class="muted">Ikke i noe registrert verneområde.</div>`;
+  let h = inn.length ? vernItems(inn.map(v => Object.assign({}, v, {_d: 0}))) : (naer.length ? "" : `<div class="muted">Ingen registrerte verneområder</div>`);
   if(naer.length) h += `<div class="tier">Innen 1 km</div>` + vernItems(naer);
   setCard("natur", h);
   const erReservat = v => /reservat/i.test(v.verneform || "");
