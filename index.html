@@ -153,6 +153,7 @@ body.kartfull .kart-fullbtn{display:none}
       <label><input type="checkbox" data-layer="kultur"> Kulturminner</label>
       <label><input type="checkbox" data-layer="vern"> Verneområde</label>
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
+      <label><input type="checkbox" data-layer="tur"> Turstier</label>
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
     <button type="button" id="kart-close">‹ Tilbake</button>
@@ -456,6 +457,11 @@ let kartAcc = 0, kartBtn = null, kartFraAdresse = false;
 const KART_LAG = {
   vern: {on: true},      // tegnes som skravert polygon fra Miljødirektoratets data (se drawVernPolys)
   reservat: {on: true},
+  tur: {
+    url: "https://wms.geonorge.no/skwms1/wms.friluftsruter2",
+    layers: "Fotrute", z: 7, opacity: 1, on: true,
+    attr: "Turruter © Kartverket m.fl."
+  },
   kultur: {
     url: "https://kart.ra.no/wms/kulturminner2",
     layers: "Kulturminner", z: 6, opacity: 0.9, on: true,
@@ -466,7 +472,7 @@ const KART_PREF = "stedsinfo-kart";
 let map = null, kartPos = null, posLayers = [];
 const kartLag = {};
 // Treff per kartlag (null = ikke sjekket ennå). Lag uten treff skjules.
-const kartTreff = {kultur: null, vern: null, reservat: null};
+const kartTreff = {kultur: null, vern: null, reservat: null, tur: null};
 function updateKartValg(){
   let any = false;
   document.querySelectorAll("#kart-valg label").forEach(l => {
@@ -521,6 +527,28 @@ function drawKultMarks(){
   });
 }
 function setTreff(k, v){ kartTreff[k] = v; updateKartValg(); }
+function lonLatTo3857(lon, lat){
+  return [lon * 20037508.34 / 180, Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * 6378137];
+}
+// Sjekker om turrutelaget har noe innen 1 km ved å hente et lite kartbilde og se etter piksler
+async function sjekkTur(lat, lon){
+  const [x, y] = lonLatTo3857(lon, lat), r = 1000 / Math.cos(lat * Math.PI / 180), S = 160;
+  const url = `${KART_LAG.tur.url}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${KART_LAG.tur.layers}&STYLES=&CRS=EPSG:3857` +
+    `&BBOX=${x - r},${y - r},${x + r},${y + r}&WIDTH=${S}&HEIGHT=${S}&FORMAT=image/png&TRANSPARENT=true`;
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error("HTTP " + resp.status);
+  const bmp = await createImageBitmap(await resp.blob());
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = S;
+  const ctx = cv.getContext("2d");
+  ctx.drawImage(bmp, 0, 0);
+  const px = ctx.getImageData(0, 0, S, S).data, c = S / 2;
+  for(let i = 3; i < px.length; i += 4){
+    const k = (i - 3) / 4;
+    if(px[i] > 0 && Math.hypot(k % S - c, Math.floor(k / S) - c) <= c) return true; // bare innen 1 km-sirkelen
+  }
+  return false;
+}
 
 function kartPrefs(){
   try{ return JSON.parse(localStorage.getItem(KART_PREF) || "{}"); } catch(e){ return {}; }
@@ -691,7 +719,8 @@ async function runAll(lat, lon, acc, fraAdresse){
   const jobs = [
     loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
     loadNatur(lat, lon).catch(e => { setCard("natur", errHtml(e)); setTreff("vern", true); setTreff("reservat", true); }),
-    loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); })
+    loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
+    sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true))
   ];
   await Promise.all(jobs);
   if(acc && acc > 50){
