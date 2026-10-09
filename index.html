@@ -443,7 +443,6 @@ async function loadKultur(lat, lon){
     ? `<div class="muted">Nærmeste kulturminner - innen 1 km</div>` + kulturItems(forste) +
       (resten.length ? `<div id="k-rest" hidden>${kulturItems(resten)}</div><button type="button" class="more" id="k-mer">Vis flere (${resten.length})</button>` : "")
     : `<div class="muted">Ingen registrerte kulturminner.</div>`;
-  h += `<div class="muted" style="margin-top:8px">Avstand er til nærmeste punkt/kant av kulturminnet. Kulturminner med begrenset offentlighet vises ikke.</div>`;
   setCard("kultur", h);
   const mer = $("#k-mer");
   if(mer) mer.addEventListener("click", () => { $("#k-rest").hidden = false; mer.remove(); });
