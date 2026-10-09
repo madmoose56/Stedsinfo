@@ -9,14 +9,13 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v18).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v19).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Kart
 - Kartverket topo som bunn. Lag med avkrysning: kulturminner, verneområde, naturreservat (turstier er fjernet). Lag uten treff innen 1 km skjules.
 - Kulturminner: de 50 nærmeste innen 1 km hentes; kortet viser 3 + «Vis flere». Hvert treff har nummer K1, K2 … (etter avstand), vist i kortet, i kartlisten og som merke på kartet (bare når laget er avkrysset og treffet er innenfor valgt radius). Kartradius 100 m / 500 m / 1 km: to knapper øverst til høyre på kartet viser de to radiusene som ikke er valgt. Riksantikvarens API (api.ra.no) tar med oppføringer uten geometri fra hele landet, så spørringen må avgrenses med `kommune=` (kommunene rundt posisjonen) i tillegg til `bbox`.
-- «Vis liste» under kartet viser først 5 treff sortert på avstand, «Vis flere» gir 10 til; trykk på ett for å se det på kartet.
-- «Åpne i full størrelse» gir fullskjerm. Radiusknapp bytter mellom 100 m og 1 km.
+- Liten knapp «full størrelse» nede i høyre hjørne av kartet gir fullskjerm («‹ Tilbake» for å lukke). «Vis liste» under kartet er fjernet.
 
 ## Arbeidsmåte
 - Må ligge på HTTPS (GPS krever det), f.eks. GitHub Pages: https://madmoose56.github.io/Stedsinfo/ (repo `madmoose56/Stedsinfo`, gren `main`). Claude committer og pusher selv.

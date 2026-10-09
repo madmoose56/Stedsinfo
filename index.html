@@ -73,6 +73,10 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
   min-width:52px;height:36px;padding:0 10px;font:700 14px/1 -apple-system,BlinkMacSystemFont,sans-serif;
   box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
 .kart-radius:active{background:#e8efe9}
+.kart-fullbtn{background:#fff;color:#14532d;border:2px solid rgba(0,0,0,.3);border-radius:8px;padding:4px 8px;
+  font:700 12px/1.15 -apple-system,BlinkMacSystemFont,sans-serif;text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
+body.kartfull .kart-fullbtn{display:none}
 .kart-radius-box{display:flex;flex-direction:column;gap:6px}
 .seg{display:flex;margin:4px 0 12px;border:1px solid var(--accent);border-radius:12px;overflow:hidden}
 .seg button{flex:1;border:0;background:var(--card);color:var(--accent);padding:12px 8px;font-weight:600}
@@ -86,7 +90,7 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
 .frow.eller{align-items:flex-end}
 .frow .pnr{flex:0 0 36%}.frow .sted{flex:1;min-width:0}
 .ell{align-self:flex-end;margin-bottom:21px;color:var(--muted);font-size:14px}
-#adr-res .pick,#kart-liste .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
+#adr-res .pick{display:block;width:100%;text-align:left;margin:6px 0 0;padding:10px 12px;background:none;
   border:1px solid var(--line);border-radius:10px;color:var(--text)}
 .toggles{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .toggles label{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);
@@ -139,9 +143,6 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
     </div>
     <div id="map" role="application" aria-label="Kart over området rundt deg"></div>
-    <button type="button" class="more" id="kart-full">Åpne i full størrelse ↗</button>
-    <button type="button" class="more" id="kart-liste-btn" style="margin-left:16px">Vis liste</button>
-    <div id="kart-liste" hidden></div>
     <button type="button" id="kart-close">‹ Tilbake</button>
     <div class="muted" id="kart-info" style="margin-top:8px">Blå prikk er posisjonen din. Stiplet ring viser radius 100 m.</div>
   </section>
@@ -470,9 +471,10 @@ function updateKartValg(){
   });
   $("#kart-valg").hidden = !any;
   drawKultMarks();
-  if(kartListeOpen) renderListe();
 }
 // K1, K2 … på kartet. Vises bare når Kulturminner er avkrysset og treffet er innenfor valgt radius.
+// treff som brukes til K1, K2 … på kartet
+const kartListe = {kultur: [], vern: []};
 let kartK = null;
 function drawKultMarks(){
   if(!map) return;
@@ -487,50 +489,6 @@ function drawKultMarks(){
 }
 function setTreff(k, v){ kartTreff[k] = v; updateKartValg(); }
 
-/* ---------- liste over treff (sortert på avstand) ---------- */
-const kartListe = {kultur: [], vern: []};
-let kartListeOpen = false, kartListeN = 5, kartListeVis = [], kartMark = null;
-function renderListe(){
-  const box = $("#kart-liste");
-  box.hidden = !kartListeOpen;
-  if(!kartListeOpen) return;
-  const on = k => kartTreff[k] === true && $(`#kart-valg input[data-layer="${k}"]`).checked;
-  const items = [];
-  if(on("kultur")) kartListe.kultur.forEach(k => { if(k.d <= kartRadius) items.push({navn: k.navn || "(uten navn)", nr: k.nr, art: k.vern || "Kulturminne", d: k.d, pt: k.pt, link: safeUrl(k.link)}); });
-  kartListe.vern.forEach(v => { if((on(v.type) || on("vern")) && v.d <= kartRadius) items.push(v); });
-  items.sort((a, b) => a.d - b.d);
-  kartListeVis = items;
-  if(!items.length){ box.innerHTML = `<div class="muted">Ingen treff i de valgte lagene.</div>`; return; }
-  box.innerHTML = items.slice(0, kartListeN).map((x, i) =>
-    `<button type="button" class="pick" data-i="${i}"><span class="dist">${x.d < 1 ? "Her" : fmtDist(x.d)}</span>` +
-    `${x.nr ? `<span class="kbadge">K${x.nr}</span> ` : ""}<b>${esc(x.navn)}</b><br><span class="muted">${esc(x.art)}</span></button>`).join("") +
-    (items.length > kartListeN ? `<button type="button" class="more" id="liste-mer">Vis flere (${items.length - kartListeN})</button>` : "");
-}
-function visPaaKart(x){
-  if(!map || !kartPos || (!x.pt && !x.bounds)) return;
-  if(!kartMark) kartMark = L.layerGroup().addTo(map);
-  kartMark.clearLayers();
-  if(x.d < 1 && x.bounds){
-    map.fitBounds(x.bounds, {animate: false, padding: [20, 20]});
-  } else {
-    kartMark.addLayer(L.polyline([kartPos, x.pt], {color: "#c2410c", weight: 2, dashArray: "4 6"}));
-    kartMark.addLayer(L.circleMarker(x.pt, {radius: 8, color: "#fff", weight: 2.5, fillColor: "#c2410c", fillOpacity: 1})
-      .bindTooltip(x.navn, {permanent: true, direction: "top", offset: [0, -8]}));
-    map.fitBounds([kartPos, x.pt], {animate: false, padding: [45, 45], maxZoom: 17});
-  }
-  $("#map").scrollIntoView({block: "center", behavior: "smooth"});
-}
-$("#kart-liste-btn").addEventListener("click", () => {
-  kartListeOpen = !kartListeOpen;
-  $("#kart-liste-btn").textContent = kartListeOpen ? "Skjul liste" : "Vis liste";
-  kartListeN = 5;
-  renderListe();
-});
-$("#kart-liste").addEventListener("click", e => {
-  const p = e.target.closest(".pick"), m = e.target.closest("#liste-mer");
-  if(m){ kartListeN += 10; renderListe(); }
-  else if(p) visPaaKart(kartListeVis[+p.dataset.i]);
-});
 function kartPrefs(){
   try{ return JSON.parse(localStorage.getItem(KART_PREF) || "{}"); } catch(e){ return {}; }
 }
@@ -572,6 +530,19 @@ function initMap(){
     }
   });
   map.addControl(new RadiusCtl());
+  // liten knapp nede i høyre hjørne som åpner kartet i full størrelse
+  const FullCtl = L.Control.extend({
+    options: {position: "bottomright"},
+    onAdd(){
+      const b = L.DomUtil.create("button", "kart-fullbtn");
+      b.type = "button";
+      b.innerHTML = "full<br>størrelse";
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, "click", () => kartFull(true));
+      return b;
+    }
+  });
+  map.addControl(new FullCtl());
   return true;
 }
 function drawKart(){
@@ -601,7 +572,6 @@ function drawKart(){
   $("#kart-info").hidden = kartFraAdresse;
   $("#kart-info").textContent = "Blå prikk er posisjonen din. Stiplet ring viser radius " + rad + ".";
   drawKultMarks();
-  if(kartListeOpen) renderListe();
 }
 function showKart(lat, lon, acc){
   if(!initMap()) return;
@@ -618,7 +588,6 @@ function kartFull(on){
   map.invalidateSize({pan: false});
   if(!on && kartFullView){ map.setView(kartFullView[0], kartFullView[1], {animate: false}); }
 }
-$("#kart-full").addEventListener("click", () => kartFull(true));
 $("#kart-close").addEventListener("click", () => kartFull(false));
 
 /* ---------- hovedflyt ---------- */
@@ -631,7 +600,6 @@ async function runAll(lat, lon, acc, fraAdresse){
   loading();
   Object.keys(kartTreff).forEach(k => { kartTreff[k] = null; });
   kartListe.kultur = []; kartListe.vern = [];
-  if(kartMark) kartMark.clearLayers();
   updateKartValg();
   loadMobil();
   showKart(lat, lon, acc);
