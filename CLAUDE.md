@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v19).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v20).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Kart
