@@ -58,7 +58,8 @@ a{color:var(--accent)}
 .links.rad{display:flex;gap:6px}
 .links.rad a{flex:1;min-width:0;margin:4px 0;padding:8px 4px;display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap}
 .links a .op{width:22px;height:22px;vertical-align:middle;margin:0 6px 0 0;flex:none}
-.avg{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-size:15px}
+.avg{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;padding:2px 0;font-size:15px}
+.avg .mod{font-size:12px;font-weight:700;padding:0 6px;border-radius:6px;background:var(--line);color:var(--text)}
 .avg .t{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px}
 .avg .l{font-weight:700;min-width:34px}
 .sanntid{color:#15803d;font-size:12px;font-weight:700}
@@ -528,6 +529,8 @@ async function loadGeo(lat, lon){
 
 /* ---------- Kollektivtransport (Entur Journey Planner) ---------- */
 const TRANS_IKON = {bus: "\u{1F68C}", coach: "\u{1F68C}", tram: "\u{1F68B}", metro: "\u{1F687}", rail: "\u{1F686}", water: "\u26F4\uFE0F", air: "\u2708\uFE0F", cableway: "\u{1F6A1}", funicular: "\u{1F6A0}", lift: "\u{1F6A1}"};
+const TRANS_NAVN = {bus: "Buss", coach: "Buss", tram: "Trikk", metro: "T-bane", rail: "Tog", water: "Båt", air: "Fly", cableway: "Taubane", funicular: "Kabelbane", lift: "Heis"};
+const transNavn = m => TRANS_NAVN[m] || m || "";
 async function enturSpor(query){
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 20000);
   try{
@@ -558,14 +561,16 @@ async function loadKollektiv(lat, lon){
   }
   const rad = e => {
     const p = e.node.place, ikon = (p.transportMode || []).map(m => TRANS_IKON[m] || "").join(" ");
+    const typer = [...new Set((p.transportMode || []).map(transNavn))].join(", ");
     const ok = p.quays.filter(x => x.wheelchairAccessible === "possible").length;
     const tilg = ok ? `Rullestol mulig på ${ok} av ${p.quays.length} plattformer` : "Ingen opplysninger om tilgjengelighet";
     const avg = (p.estimatedCalls || []).filter(c => !c.cancellation).slice(0, 3).map(c => {
       const k = klokke(c.expectedDepartureTime);
-      return `<div class="avg"><span class="t">${k.hh}</span><span class="l">${esc(c.serviceJourney.line.publicCode || "")}</span>` +
+      const lm = c.serviceJourney.line.transportMode;
+      return `<div class="avg"><span class="t">${k.hh}</span><span class="mod">${esc(transNavn(lm))}</span><span class="l">${esc(c.serviceJourney.line.publicCode || "")}</span>` +
         `<span>${esc(c.destinationDisplay.frontText)}</span>${c.realtime ? '<span class="sanntid">sanntid</span>' : ""}${k.min ? `<span class="muted">${k.min}</span>` : ""}</div>`;
     }).join("") || `<div class="muted">Ingen avganger de neste to timene.</div>`;
-    return `<div class="item"><span class="dist">${fmtDist(e.node.distance)}</span><div class="n">${ikon} ${esc(p.name)}</div>${avg}<div class="muted">${tilg}</div></div>`;
+    return `<div class="item"><span class="dist">${fmtDist(e.node.distance)}</span><div class="n">${ikon} ${esc(p.name)}</div><div class="muted">${esc(typer)}</div>${avg}<div class="muted">${tilg}</div></div>`;
   };
   const f = stopp.slice(0, 3), r = stopp.slice(3);
   let h = f.map(rad).join("") + (r.length ? `<div id="nr-stopp" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="stopp">Vis flere (${r.length})</button>` : "");
