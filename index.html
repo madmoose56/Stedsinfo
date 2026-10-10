@@ -159,6 +159,7 @@ body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
   <section class="card" id="c-sted"><h2>Sted</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-eiendom"><h2>Eiendom</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-eier"><h2>Eier</h2><div class="spin">…</div></section>
+  <section class="card" id="c-plan"><h2>Plankart og reguleringsplan</h2><div class="spin">…</div></section>
   <section class="card" id="c-mobil"><h2>Sjekk mobildekning</h2><div class="spin">…</div></section>
   <section class="card" id="c-natur"><h2>Natur og verneområder</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
@@ -330,6 +331,19 @@ async function loadSted(lat, lon){
   setCard("eier", `
     <div class="links"><a href="https://seeiendom.kartverket.no" target="_blank" rel="noopener">Se eiendom (Kartverket)</a></div>
     ${matrikkel ? `<div class="muted">Søk på matrikkelnummer: <b>${esc(matrikkel)}</b></div>` : ""}`);
+  setCard("plan", planHtml(lat, lon, k));
+}
+
+// Plankart og reguleringsplaner finnes ikke som åpent kartlag for hele landet. Vi lenker til kommunens planregister
+// (arealplaner.no, adresse: kommunenavn + kommunenummer) og til Kommunekart på posisjonen.
+function planHtml(lat, lon, k){
+  const slug = n => String(n || "").toLowerCase().replace(/æ/g, "ae").replace(/ø/g, "o").replace(/å/g, "a")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  let h = "";
+  if(k && k.kommunenavn && k.kommunenummer)
+    h += `<a href="https://arealplaner.no/${slug(k.kommunenavn)}${esc(k.kommunenummer)}/arealplaner/search" target="_blank" rel="noopener">Planregister ${esc(k.kommunenavn)}</a>`;
+  h += `<a href="https://kommunekart.com/?funksjon=vispunkt&x=${lat}&y=${lon}&zoom=17&bakgrunnskart=0" target="_blank" rel="noopener">Kommunekart her</a>`;
+  return `<div class="links">${h}</div>`;
 }
 
 /* ---------- Mobildekning ---------- */
@@ -827,7 +841,7 @@ async function runAll(lat, lon, acc, fraAdresse){
   loadMobil();
   showKart(lat, lon, acc);
   const jobs = [
-    loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
+    loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); setCard("plan", planHtml(lat, lon, null)); }),
     loadNatur(lat, lon).catch(e => { setCard("natur", errHtml(e)); setTreff("vern", true); setTreff("reservat", true); }),
     loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
     sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true)),
