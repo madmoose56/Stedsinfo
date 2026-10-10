@@ -429,9 +429,13 @@ function nearestPt(g, lat, lon){
   return pt;
 }
 // liten «Kart»-knapp ved hvert treff: åpner kartet i full størrelse sentrert på treffet, radius 100 m
-function kartKnapp(pt, pre, nr, cls, navn){
+function popLenke(url, tekst){
+  const u = safeUrl(url);
+  return u ? `<br><a href="${esc(u)}" target="_blank" rel="noopener">${esc(tekst || "Mer informasjon")}</a>` : "";
+}
+function kartKnapp(pt, pre, nr, cls, navn, url, urltekst){
   return pt && isFinite(pt[0]) && isFinite(pt[1])
-    ? `<button type="button" class="kartbtn" data-lat="${pt[0]}" data-lon="${pt[1]}" data-pre="${esc(pre || "")}" data-nr="${esc(nr == null ? "" : nr)}" data-cls="${esc(cls || "")}" data-navn="${esc(navn || "")}">Kart</button>` : "";
+    ? `<button type="button" class="kartbtn" data-lat="${pt[0]}" data-lon="${pt[1]}" data-pre="${esc(pre || "")}" data-nr="${esc(nr == null ? "" : nr)}" data-cls="${esc(cls || "")}" data-navn="${esc(navn || "")}" data-url="${esc(url || "")}" data-urltxt="${esc(urltekst || "")}">Kart</button>` : "";
 }
 let kartTreffMark = null, kartKunTreff = null; // kartKunTreff: når satt, vises bare dette ene treffet på kartet
 function kartTilTreff(lat, lon, info){
@@ -448,20 +452,21 @@ function kartTilTreff(lat, lon, info){
   // alle andre treff er skjult; vis bare dette med merke og navn
   const tekst = (info.pre || "") + (info.nr || "");
   kartTreffMark.addLayer(L.marker([lat, lon], {icon: L.divIcon({className: "", iconSize: [0, 0],
-    html: `<div class="kmark ${esc(info.cls || "")}">${esc(tekst || "\u2022")}${info.navn ? `<span class="mlab">${esc(kort(info.navn))}</span>` : ""}</div>`})}));
+    html: `<div class="kmark ${esc(info.cls || "")}">${esc(tekst || "\u2022")}${info.navn ? `<span class="mlab">${esc(kort(info.navn))}</span>` : ""}</div>`})})
+    .bindPopup(`<b>${esc(tekst)} ${esc(info.navn || "")}</b>${popLenke(info.url, info.urltekst)}`));
 }
 document.addEventListener("click", e => {
   const b = e.target.closest(".kartbtn");
   if(!b) return;
   e.preventDefault(); e.stopPropagation();
-  kartTilTreff(+b.dataset.lat, +b.dataset.lon, {pre: b.dataset.pre, nr: b.dataset.nr, cls: b.dataset.cls, navn: b.dataset.navn});
+  kartTilTreff(+b.dataset.lat, +b.dataset.lon, {pre: b.dataset.pre, nr: b.dataset.nr, cls: b.dataset.cls, navn: b.dataset.navn, url: b.dataset.url, urltekst: b.dataset.urltxt});
 });
 function vernItems(list){
   return list.map(v => {
     const link = safeUrl(v.faktaark);
     return `<div class="item"><div class="n">${esc(v.offisieltNavn || v.navn)}${v._d != null ? ` <span class="muted">· ${fmtDist(v._d)}</span>` : ""}</div>
       <div class="s">${esc(v.verneform)}${v.forvaltningsmyndighet ? " · " + esc(v.forvaltningsmyndighet) : ""}</div>
-      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}${kartKnapp(v._pt, "V", "", "kn", v.offisieltNavn || v.navn)}</div>`;
+      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}${kartKnapp(v._pt, "V", "", "kn", v.offisieltNavn || v.navn, v.faktaark, "Faktaark")}</div>`;
   }).join("");
 }
 /* ---------- Natur-kortet: verneområder, naturtyper og friluftslivsområder ---------- */
@@ -493,7 +498,7 @@ function naturListe(liste, id, pre, cls, avstandNede){
     const link = safeUrl(x.faktaark);
     const avst = `<span class="dist">${x._d < 1 ? "Her" : fmtDist(x._d)}</span>`;
     return `<div class="item">${avstandNede ? "" : avst}<div class="n"><span class="kbadge ${cls}">${pre}${x.nr}</span> ${esc(x.navn)}</div>` +
-      `<div class="s">${avstandNede ? avst : ""}${esc(x.under)}</div>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}${kartKnapp(x.pt, pre, x.nr, cls, x.navn)}</div>`;
+      `<div class="s">${avstandNede ? avst : ""}${esc(x.under)}</div>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}${kartKnapp(x.pt, pre, x.nr, cls, x.navn, x.faktaark, "Faktaark")}</div>`;
   };
   const f = liste.slice(0, 3), r = liste.slice(3);
   return f.map(rad).join("") + (r.length
@@ -503,7 +508,7 @@ async function loadNaturtyper(lat, lon){
   const l = await arcInnen("naturtyper_hb13", 0, lat, lon, "omraadenavn,naturtype,verdi,faktaark");
   const liste = l.map((x, i) => ({nr: i + 1, navn: x.omraadenavn || NATURTYPE[x.naturtype] || x.naturtype || "(uten navn)",
     under: [NATURTYPE[x.naturtype] || x.naturtype, NATURVERDI[x.verdi]].filter(Boolean).join(" · "), faktaark: x.faktaark, _d: x._d, pt: x._pt}));
-  kartListe.ntyp = liste.map(x => ({nr: x.nr, navn: x.navn, d: x._d, pt: x.pt, art: x.under}));
+  kartListe.ntyp = liste.map(x => ({nr: x.nr, navn: x.navn, d: x._d, pt: x.pt, art: x.under, url: x.faktaark, urlTekst: "Faktaark"}));
   setTreff("ntyp", liste.length > 0);
   naturDeler.typer = naturListe(liste, "typer", "N", "kn");
   renderNatur();
@@ -512,7 +517,7 @@ async function loadFriluft(lat, lon){
   const l = await arcInnen("friluftsliv_kartlagt", 1, lat, lon, "omraadenavn,omraadetype_beskrivelse,omraadeverdi_beskrivelse,faktaark");
   const liste = l.map((x, i) => ({nr: i + 1, navn: x.omraadenavn || x.omraadetype_beskrivelse || "(uten navn)",
     under: [x.omraadetype_beskrivelse, x.omraadeverdi_beskrivelse].filter(Boolean).join(" · "), faktaark: x.faktaark, _d: x._d, pt: x._pt}));
-  kartListe.friluft = liste.map(x => ({nr: x.nr, navn: x.navn, d: x._d, pt: x.pt, art: x.under}));
+  kartListe.friluft = liste.map(x => ({nr: x.nr, navn: x.navn, d: x._d, pt: x.pt, art: x.under, url: x.faktaark, urlTekst: "Faktaark"}));
   setTreff("friluft", liste.length > 0);
   naturDeler.friluft = naturListe(liste, "friluft", "F", "kf", true);
   renderNatur();
@@ -541,7 +546,7 @@ async function loadNatur(lat, lon){
   kartListe.vern = n1000.map(v => {
     const i = info.get(key(v));
     return {navn: v.offisieltNavn || v.navn || "(uten navn)", art: v.verneform || "", rings: v._rings,
-      d: seenIn.has(key(v)) ? 0 : i.d, type: erReservat(v) ? "reservat" : "vern"};
+      d: seenIn.has(key(v)) ? 0 : i.d, type: erReservat(v) ? "reservat" : "vern", url: v.faktaark, urlTekst: "Faktaark"};
   }).filter(x => x.d <= 1000);
   drawVernPolys();
   setTreff("vern", kartListe.vern.some(x => x.type === "vern"));
@@ -664,11 +669,11 @@ async function loadParkering(lat, lon){
       d: Math.hypot(p[0], p[1]), pt: [la, lo]};
   }).filter(x => x && x.d <= R).sort((a, b) => a.d - b.d).slice(0, 40);
   liste.forEach((x, i) => { x.nr = i + 1; });
-  kartListe.park = liste.map(x => ({nr: x.nr, navn: x.navn, d: x.d, pt: x.pt, art: x.typ + (x.info ? " · " + x.info : "")}));
+  kartListe.park = liste.map(x => ({nr: x.nr, navn: x.navn, d: x.d, pt: x.pt, art: x.typ + (x.info ? " · " + x.info : ""), url: x.osm, urlTekst: "OpenStreetMap"}));
   setTreff("park", liste.length > 0);
   if(!liste.length){ setCard("parkering", `<div class="muted">Ingen registrerte parkeringsplasser innen ${R} m.</div>`); return; }
   const rad = x => `<div class="item"><span class="dist">${fmtDist(x.d)}</span><div class="n"><span class="kbadge kp">P${x.nr}</span> ${esc(x.navn)}</div>` +
-    `<div class="s">${esc(x.typ)}${x.info ? " · " + esc(x.info) : ""}</div><a href="${x.osm}" target="_blank" rel="noopener">OpenStreetMap</a>${kartKnapp(x.pt, "P", x.nr, "kp", x.navn)}</div>`;
+    `<div class="s">${esc(x.typ)}${x.info ? " · " + esc(x.info) : ""}</div><a href="${x.osm}" target="_blank" rel="noopener">OpenStreetMap</a>${kartKnapp(x.pt, "P", x.nr, "kp", x.navn, x.osm, "OpenStreetMap")}</div>`;
   const f = liste.slice(0, 3), r = liste.slice(3);
   setCard("parkering", f.map(rad).join("") + (r.length
     ? `<div id="nr-park" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="park">Vis flere (${r.length})</button>` : "") +
@@ -745,13 +750,13 @@ async function loadArter(lat, lon){
       const rl = RODLISTE[x.status] ? `<span class="rl">${RODLISTE[x.status]}</span>` : "";
       const funn = x.funn.slice(0, 8).map(f => `<div class="funn">${datoNo(f.dato)} · ${fmtDist(f.d)}${f.antall ? " · " + esc(f.antall) + " stk." : ""}<br>` +
         `<span class="muted">${[f.av && "Observert av " + esc(f.av), f.sted && esc(f.sted), esc(f.kilde) + (f.info ? " (" + esc(f.info) + ")" : "")].filter(Boolean).join(" · ")}</span>` +
-        `${safeUrl(f.url) ? ` · <a href="${esc(f.url)}" target="_blank" rel="noopener">Se funnet</a>` : ""} ${kartKnapp([f.la, f.lo], "A", x.nr, "ka", x.navn || x.sci)}</div>`).join("");
+        `${safeUrl(f.url) ? ` · <a href="${esc(f.url)}" target="_blank" rel="noopener">Se funnet</a>` : ""} ${kartKnapp([f.la, f.lo], "A", x.nr, "ka", x.navn || x.sci, f.url, "Se funnet")}</div>`).join("");
       return `<details class="art"><summary><span class="dist">${fmtDist(x.naer)}</span><span class="n"><span class="kbadge ka">A${x.nr}</span> ${esc(x.navn || x.sci)}</span>${rl}<br>` +
-        `<span class="muted">${x.navn ? "<i>" + esc(x.sci) + "</i> · " : ""}${x.funn.length} funn · sist ${datoNo(x.sist)}</span> ${(() => { const n = x.funn.reduce((a, b) => b.d < a.d ? b : a); return kartKnapp([n.la, n.lo], "A", x.nr, "ka", x.navn || x.sci); })()}</summary>${funn}${x.funn.length > 8 ? `<div class="muted">… og ${x.funn.length - 8} funn til</div>` : ""}</details>`;
+        `<span class="muted">${x.navn ? "<i>" + esc(x.sci) + "</i> · " : ""}${x.funn.length} funn · sist ${datoNo(x.sist)}</span> ${(() => { const n = x.funn.reduce((a, b) => b.d < a.d ? b : a); return kartKnapp([n.la, n.lo], "A", x.nr, "ka", x.navn || x.sci, n.url, "Se funnet"); })()}</summary>${funn}${x.funn.length > 8 ? `<div class="muted">… og ${x.funn.length - 8} funn til</div>` : ""}</details>`;
     };
     const vis = grupper.slice(0, 40), f = vis.slice(0, 5), r = vis.slice(5);
     vis.forEach((x, i) => { x.nr = i + 1; });
-    kartListe.arter = vis.map(x => { const n = x.funn.reduce((a, b) => b.d < a.d ? b : a); return {nr: x.nr, navn: x.navn || x.sci, d: n.d, pt: [n.la, n.lo], art: x.sci}; });
+    kartListe.arter = vis.map(x => { const n = x.funn.reduce((a, b) => b.d < a.d ? b : a); return {nr: x.nr, navn: x.navn || x.sci, d: n.d, pt: [n.la, n.lo], art: x.sci, url: n.url, urlTekst: "Se funnet"}; });
     setTreff("arter", kartListe.arter.length > 0);
     h = `<div class="muted">${liste.length} funn av ${grupper.length} arter innen ${R} m, siste 5 år. Trykk på en art for funnene.</div>` + f.map(rad).join("") +
       (r.length ? `<div id="nr-arter" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="arter">Vis flere (${r.length})</button>` : "") +
@@ -768,7 +773,7 @@ function kulturItems(list){
     return `<div class="item"><span class="dist">${fmtDist(k.d)}</span>
       <div class="n"><span class="kbadge">K${k.nr}</span> ${esc(k.navn || "(uten navn)")}</div>
       <div class="s">${esc(k.vern || "")}${k.kommune ? " · kommune " + esc(k.kommune) : ""}</div>
-      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Kulturminnesøk</a>` : ""}${kartKnapp(k.pt, "K", k.nr, "", k.navn)}</div>`;
+      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Kulturminnesøk</a>` : ""}${kartKnapp(k.pt, "K", k.nr, "", k.navn, k.link, "Kulturminnesøk")}</div>`;
   }).join("");
   return h;
 }
@@ -914,7 +919,7 @@ function drawPunkt(){
       if(!x.pt || !iUtsnitt(x.pt)) return;
       g.addLayer(L.marker(x.pt, {icon: L.divIcon({className: "", iconSize: [0, 0],
         html: `<div class="kmark ${p.cls}">${p.pre}${x.nr}${x.navn ? `<span class="mlab">${esc(kort(x.navn))}</span>` : ""}</div>`})})
-        .bindPopup(`<b>${p.pre}${x.nr} ${esc(x.navn || "")}</b>${x.art ? "<br>" + esc(x.art) : ""}<br>${x.d < 1 ? "Her" : fmtDist(x.d)}`));
+        .bindPopup(`<b>${p.pre}${x.nr} ${esc(x.navn || "")}</b>${x.art ? "<br>" + esc(x.art) : ""}<br>${x.d < 1 ? "Her" : fmtDist(x.d)}${popLenke(x.url, x.urlTekst)}`));
     });
   });
 }
@@ -949,7 +954,7 @@ function drawVernPolys(){
     const h = HATCH[v.type];
     L.polygon((v.rings || []).map(r => r.map(c => [c[1], c[0]])), {
       renderer: hatchRenderer, color: h.farge, weight: 2, opacity: 0.9, fillColor: "url(#" + h.id + ")", fillOpacity: 1
-    }).bindPopup(`<b>${esc(v.navn)}</b><br>${esc(v.art)}${v.d >= 1 ? " · " + fmtDist(v.d) : ""}`).addTo(kartLag[v.type]);
+    }).bindPopup(`<b>${esc(v.navn)}</b><br>${esc(v.art)}${v.d >= 1 ? " · " + fmtDist(v.d) : ""}${popLenke(v.url, v.urlTekst)}`).addTo(kartLag[v.type]);
   });
 }
 // treff som brukes til K1, K2 … på kartet
@@ -967,7 +972,7 @@ function drawKultMarks(){
   kartListe.kultur.forEach(k => {
     if(!k.pt || !iUtsnitt(k.pt)) return;
     kartK.addLayer(L.marker(k.pt, {icon: L.divIcon({className: "", html: `<div class="kmark">K${k.nr}${k.navn ? `<span class="mlab">${esc(kort(k.navn))}</span>` : ""}</div>`, iconSize: [0, 0]})})
-      .bindPopup(`<b>K${k.nr} ${esc(k.navn || "(uten navn)")}</b><br>${fmtDist(k.d)}`));
+      .bindPopup(`<b>K${k.nr} ${esc(k.navn || "(uten navn)")}</b><br>${fmtDist(k.d)}${popLenke(k.link, "Kulturminnesøk")}`));
   });
 }
 function setTreff(k, v){ kartTreff[k] = v; updateKartValg(); }

@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v63).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v64).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -40,6 +40,9 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 ## Parkering (P1…)
 - Kortet «Parkering» (under Kollektivtransport): parkeringsplasser innen 500 m fra OpenStreetMap (`amenity=parking`, via Overpass; gateparkering og private plasser er utelatt), med type, antall plasser, avgift, HC- og ladeplasser når det er registrert. Har kart-valg «Parkering» med P-merker, «Kart»-knapp og er åpne/lukke-bart som de andre temaene.
 - Klassenavn på merkene er kh/kp/ka/kn/kf (ikke enkeltbokstaver: `.f` er skjemastil og ga en grønn stripe i Friluftslivsområder). Friluftslivsområder har avstanden på beskrivelseslinjen, nede til høyre.
+
+## Lenke i kartets popup
+- Trykker du på et merke på kartet, viser popup-en navn, avstand og samme lenke som i listen: Kulturminnesøk (K), Faktaark (N, F og verneområder), «Se funnet» (A), OpenStreetMap (P). Holdeplasser og spisesteder har ingen lenke. Hjelper: `popLenke`.
 
 ## Kart
 - Fullskjerm av nederste kart: starter på 100 m med radiusvalgene 100 m / 500 m / 1 km (som vanlig visning). Filtervalgene ligger i en meny som trekkes ut fra høyre side med håndtaket «Vis»; avkrysningene er de samme som i det lille kartet (valg gjort ett sted gjelder begge), og et trykk på kartet lukker menyen. Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
