@@ -37,6 +37,13 @@ button{font:inherit}
   color:var(--accent-text);font-weight:600;margin:4px 0 12px}
 .btn:disabled{opacity:.6}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 12px}
+.card.kan h2{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;-webkit-user-select:none;user-select:none}
+.card.kan h2::after{content:"";flex:none;width:22px;height:22px;background:var(--accent);transition:transform .2s ease;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>") center/contain no-repeat;
+  mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>") center/contain no-repeat}
+.card.kan.apen h2::after{transform:rotate(180deg)}
+.card.kan:not(.apen) > :not(h2){display:none}
+.card.kan:not(.apen) h2{margin-bottom:0}
 .card h2{margin:0 0 8px;font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text)}
 .big{font-size:20px;font-weight:700;line-height:1.25}
 .row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--line)}
@@ -1103,6 +1110,33 @@ function kartFull(on){
 }
 $("#kart-close").addEventListener("click", () => kartFull(false));
 $("#valg-handle").addEventListener("click", () => document.body.classList.toggle("valg-open"));
+
+/* ---------- temaer som kan åpnes og lukkes (Sted og Kart står alltid åpne) ---------- */
+const KAN_LUKKES = ["c-kollektiv", "c-eiendom", "c-eier", "c-kk", "c-natur", "c-geo", "c-arter", "c-kultur"];
+const APNE_KEY = "stedsinfo-apne";
+function lesApne(){ try{ return JSON.parse(localStorage.getItem(APNE_KEY) || "{}"); } catch(e){ return {}; } }
+(function(){
+  const apne = lesApne();
+  KAN_LUKKES.forEach(id => {
+    const k = document.getElementById(id), h = k && k.querySelector("h2");
+    if(!k) return;
+    k.classList.add("kan");
+    if(apne[id]) k.classList.add("apen");
+    h.setAttribute("role", "button"); h.setAttribute("tabindex", "0");
+  });
+  const veksle = h => {
+    const k = h.closest(".card.kan");
+    if(!k) return;
+    const na = k.classList.toggle("apen");
+    k.querySelector("h2").setAttribute("aria-expanded", na ? "true" : "false");
+    const a2 = lesApne(); a2[k.id] = na;
+    try{ localStorage.setItem(APNE_KEY, JSON.stringify(a2)); } catch(e){}
+  };
+  document.addEventListener("click", e => { const h = e.target.closest(".card.kan > h2"); if(h) veksle(h); });
+  document.addEventListener("keydown", e => {
+    if((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".card.kan > h2")){ e.preventDefault(); veksle(e.target); }
+  });
+})();
 
 /* ---------- eiendomskart i full størrelse ---------- */
 let eiendomInfo = null, emap = null, eRadius = 100, eLayers = [], eBtns = null;

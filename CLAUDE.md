@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v59).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v60).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -32,6 +32,9 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## «Kart»-knapp ved treff
 - Hvert treff i Kollektivtransport, Natur (verneområder, naturtyper, friluftsliv), Arter og Kulturminner har en liten «Kart»-knapp (klasse `kartbtn`, funksjon `kartTilTreff`): åpner fullskjermkartet sentrert på treffet med radius 100 m og en gul ring rundt treffet.
+
+## Åpne/lukke temaer
+- Alle temakort unntatt Sted og Kart har en pil (chevron) i overskriften og kan åpnes/lukkes; de er lukket som standard, og valget huskes per kort i localStorage (`stedsinfo-apne`). Liste i `KAN_LUKKES`.
 
 ## Kart
 - Fullskjerm av nederste kart: starter på 100 m med radiusvalgene 100 m / 500 m / 1 km (som vanlig visning). Filtervalgene ligger i en meny som trekkes ut fra høyre side med håndtaket «Vis»; alle valg krysses av automatisk når fullskjermen åpnes (forrige avkrysning gjenopprettes ved «Tilbake»), og et trykk på kartet lukker menyen. Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
