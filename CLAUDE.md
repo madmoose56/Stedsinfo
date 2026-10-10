@@ -9,11 +9,15 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v45).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v46).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
 - Planregister-lenken (arealplaner.no) er ikke med (fjernet etter ønske). Boksen «Kommunekart» (under Eier) har én knapp som åpner Kommunekart på posisjonen. Funn: finnes ikke som åpent landsdekkende kartlag; kommunenes planregister ligger på arealplaner.no, og Kommunekart kan åpnes på posisjon med `funksjon=vispunkt&x=lat&y=lon`.
+
+## Natur-kortet og høyde
+- Kortet «Natur» har tre deler fra Miljødirektoratets ArcGIS-tjenester (kart.miljodirektoratet.no): Verneområder (laget vern), Naturtyper (naturtyper_hb13, lag 0; kodeliste for naturtype er lagt inn i koden) og Friluftslivsområder (friluftsliv_kartlagt, lag 1). Alt innen 1 km, 3 nærmeste + «Vis flere» (maks 50).
+- Høyde over havet i Sted-kortet kommer fra Kartverkets høyde-API (ws.geonorge.no/hoydedata/v1/punkt).
 
 ## Kart
 - Fullskjerm av nederste kart åpnes alltid på radius 50 m, med valgene 50 m / 500 m / 1 km (vanlig visning: 100 m / 500 m / 1 km). Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.

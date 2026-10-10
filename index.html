@@ -161,7 +161,7 @@ body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
   <section class="card" id="c-eier"><h2>Eier</h2><div class="spin">…</div></section>
   <section class="card" id="c-kk"><h2>Kommunekart</h2><div class="spin">…</div></section>
   <section class="card" id="c-mobil"><h2>Sjekk mobildekning</h2><div class="spin">…</div></section>
-  <section class="card" id="c-natur"><h2>Natur og verneområder</h2><div class="spin">Henter …</div></section>
+  <section class="card" id="c-natur"><h2>Natur</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
 
   <section class="card" id="c-kart">
@@ -274,14 +274,15 @@ function geomDist(g, lat0, lon0){
 
 /* ---------- Sted + Eiendom ---------- */
 async function loadSted(lat, lon){
-  const [kom, adr] = await Promise.allSettled([
+  const [kom, adr, hoyde] = await Promise.allSettled([
     getJson(`${API.kommune}?nord=${lat}&ost=${lon}&koordsys=4258`),
     (async () => {
       let d = await getJson(`${API.adresse}?lat=${lat}&lon=${lon}&radius=200&treffPerSide=5&asciiKompatibel=false`);
       if(!d.adresser || !d.adresser.length)
         d = await getJson(`${API.adresse}?lat=${lat}&lon=${lon}&radius=1000&treffPerSide=5&asciiKompatibel=false`);
       return d;
-    })()
+    })(),
+    getJson(`https://ws.geonorge.no/hoydedata/v1/punkt?nord=${lat}&ost=${lon}&koordsys=4258&geojson=false`)
   ]);
 
   const k = kom.status === "fulfilled" ? kom.value : null;
@@ -300,7 +301,9 @@ async function loadSted(lat, lon){
   }
   h += rows([
     ["Kommune", k ? `${k.kommunenavn} (${k.kommunenummer})` : (a ? a.kommunenavn : null)],
-    ["Fylke", k ? `${k.fylkesnavn} (${k.fylkesnummer})` : null]
+    ["Fylke", k ? `${k.fylkesnavn} (${k.fylkesnummer})` : null],
+    ["Høyde over havet", hoyde.status === "fulfilled" && hoyde.value.punkter && hoyde.value.punkter[0] && hoyde.value.punkter[0].z != null
+      ? Math.round(hoyde.value.punkter[0].z) + " m" : null]
   ]);
   if(kom.status === "rejected") h += `<div class="muted">Kommune/fylke: ${esc(kom.reason.message)} (utenfor Norge?)</div>`;
   setCard("sted", h);
@@ -394,6 +397,56 @@ function vernItems(list){
       ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}</div>`;
   }).join("");
 }
+/* ---------- Natur-kortet: verneområder, naturtyper og friluftslivsområder ---------- */
+const NATURTYPE = {"A01":"Intakte lavlandsmyrer","A02":"Intakte høgmyrer","A04":"Palsmyr","A05":"Rikmyr","A06":"Kilder og kildebekker","A07":"Intakt lavlandsmyr i innlandet","A08":"Kystmyr","A09":"Våtmarksmassiv","A10":"Høgmyrer i innlandet","A11":"Oseanisk nedbørsmyr","B01":"Sørvendte berg og rasmarker","B02":"Kantkratt","B03":"Ultrabasisk og tungmetallrik mark i lavlandet","B04":"Nordvendte kystberg og blokkmark","B05":"Grotte/gruve","B06":"Leirskredgrop","B07":"Ravinedal","B08":"Jordpyramide","B09":"Isinnfrysingsmark","B10":"Ur og rasmark","B11":"Breforland","B12":"Dødisgrop","B13":"Åpen kalkmark","B14":"Rik berglendt mark","B15":"Fosseberg","B16":"Fosse-eng","C01":"Kalkrike områder i fjellet","C02":"Arktisk alpin grunn våtmark","C03":"Rik fjellhei og tundra","C04":"Rike snøleier","D01":"Slåttemark","D02":"Slåtte- og beitemyr","D03":"Artsrik veikant","D04":"Naturbeitemark","D05":"Hagemark","D06":"Beiteskog","D07":"Kystlynghei","D08":"Kalkrike enger","D09":"Fuktenger","D11":"Småbiotoper","D12":"Store gamle trær","D13":"Parklandskap","D14":"Erstatningsbiotoper","D15":"Skrotemark","D16":"Grotter/gruver","D17":"Lauveng","D18":"Høstingsskog","D19":"Åpen grunnlendt kalkmark","D20":"Åpen kalkmark","D21":"Annen kulturmarkseng","D22":"Boreal hei","D23":"Andre viktige kulturmarkstyper","D24":"Tresatt kulturmark","D51":"Engpregete erstatningsbiotoper","D52":"Erstatningsbiotoper på berg og åpen jord","D53":"Erstatningsbiotoper på ved","E01":"Deltaområde","E02":"Mudderbank","E03":"Kroksjøer, flomdammer og meandrerende elveparti","E05":"Fossesprøytsone","E06":"Viktig bekkedrag","E07":"Kalksjø","E08":"Rik kulturlandskapssjø","E09":"Dam","E10":"Naturlig fisketomme innsjøer og tjern","E11":"Ikke forsuret restområde","E12":"Evjer, bukter og viker","E14":"Svært kalkfattig innsjø (Klar, kalkfattig innsjø)","E15":"Middels kalkrik innsjø (Klar intermediær innsjø)","E16":"Hurtigstrømmende elveløp","E17":"Roligflytende elveløp","E18":"Brakkvannssjøer","E19":"Kalkrik bekk og liten elv","E20":"Middels kalkrik bekk i låglandet","E21":"Kalkfattig og klar bekk eller elv","E22":"Elveslette","F01":"Rik edellauvskog","F02":"Gammel fattig edellauvskog","F03":"Kalkskog","F05":"Gråor-heggeskog","F06":"Rik sump- og kildeskog","F07":"Gammel boreal lauvskog","F08":"Gammel barskog","F09":"Bekkekløft og bergvegg","F10":"Brannfelt","F11":"Kystgranskog","F12":"Kystfuruskog","F13":"Rik blandingsskog i lavlandet","F14":"Gammel sumpskog","F15":"Kalkedellauvskog","F16":"Kalkbarskog","F17":"Rik barskog","F18":"Gammel granskog","F19":"Gammel furuskog","F20":"Regnskog","F21":"Flommarksskog","F22":"Sandfuruskog","F23":"Rik olivinfuruskog","F24":"Kalkskog med boreale lauvtrær","F25":"Gammel lavlandsblandingsskog","G01":"Grunne strømmer","G02":"Undervannseng","G03":"Sanddyne","G04":"Sand- og grusstrand","G05":"Strandeng og strandsump","G06":"Tangvoll","G07":"Brakkvannsdelta","G08":"Brakkvannspoller","G09":"Rikt strandberg","G10":"Fuglefjell","G11":"Kystnær grus og steinmark","H00":"Andre viktige forekomster","E04":"Åpen flommark","F04":"Rik boreal lauvskog"};
+const NATURVERDI = {A: "Svært viktig", B: "Viktig", C: "Lokalt viktig"};
+const naturDeler = {vern: null, typer: null, friluft: null};
+function renderNatur(){
+  const del = (tittel, h) => `<div class="tier">${tittel}</div>` + (h === null ? `<div class="muted">Henter …</div>` : h);
+  setCard("natur", del("Verneområder", naturDeler.vern) + del("Naturtyper", naturDeler.typer) + del("Friluftslivsområder", naturDeler.friluft));
+}
+// spør et av Miljødirektoratets kartlag om alt innen 1 km, med omriss (forenklet) så vi kan regne avstand
+async function arcInnen(tjeneste, lag, lat, lon, felt){
+  const q = new URLSearchParams({f: "json", geometry: `${lon},${lat}`, geometryType: "esriGeometryPoint", inSR: "4326",
+    spatialRel: "esriSpatialRelIntersects", distance: "1000", units: "esriSRUnit_Meter", outFields: felt,
+    returnGeometry: "true", outSR: "4326", maxAllowableOffset: "0.0002"});
+  const d = await getJson(`https://kart.miljodirektoratet.no/arcgis/rest/services/${tjeneste}/MapServer/${lag}/query?${q}`, 30000);
+  if(d.error) throw new Error(d.error.message || "ArcGIS-feil");
+  return (d.features || []).map(f => {
+    const rings = f.geometry && f.geometry.rings || [];
+    const inne = rings.some(r => inRing(r, lon, lat));
+    return Object.assign({}, f.attributes, {_d: inne ? 0 : ringsInfo(rings, lat, lon).d});
+  }).filter(x => x._d <= 1000).sort((a, b) => a._d - b._d).slice(0, 50);
+}
+function naturListe(liste, id){
+  if(!liste.length) return `<div class="muted">Ingen registrert innen 1 km</div>`;
+  const rad = x => {
+    const link = safeUrl(x.faktaark);
+    return `<div class="item"><span class="dist">${x._d < 1 ? "Her" : fmtDist(x._d)}</span><div class="n">${esc(x.navn)}</div>` +
+      `<div class="s">${esc(x.under)}</div>${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">Faktaark</a>` : ""}</div>`;
+  };
+  const f = liste.slice(0, 3), r = liste.slice(3);
+  return f.map(rad).join("") + (r.length
+    ? `<div id="nr-${id}" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="${id}">Vis flere (${r.length})</button>` : "");
+}
+async function loadNaturtyper(lat, lon){
+  const l = await arcInnen("naturtyper_hb13", 0, lat, lon, "omraadenavn,naturtype,verdi,faktaark");
+  naturDeler.typer = naturListe(l.map(x => ({navn: x.omraadenavn || NATURTYPE[x.naturtype] || x.naturtype || "(uten navn)",
+    under: [NATURTYPE[x.naturtype] || x.naturtype, NATURVERDI[x.verdi]].filter(Boolean).join(" · "), faktaark: x.faktaark, _d: x._d})), "typer");
+  renderNatur();
+}
+async function loadFriluft(lat, lon){
+  const l = await arcInnen("friluftsliv_kartlagt", 1, lat, lon, "omraadenavn,omraadetype_beskrivelse,omraadeverdi_beskrivelse,faktaark");
+  naturDeler.friluft = naturListe(l.map(x => ({navn: x.omraadenavn || x.omraadetype_beskrivelse || "(uten navn)",
+    under: [x.omraadetype_beskrivelse, x.omraadeverdi_beskrivelse].filter(Boolean).join(" · "), faktaark: x.faktaark, _d: x._d})), "friluft");
+  renderNatur();
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-vis]");
+  if(!b) return;
+  $("#nr-" + b.dataset.vis).hidden = false;
+  b.remove();
+});
 async function loadNatur(lat, lon){
   const [inn, n1000] = await Promise.all([vernQuery(lat, lon), vernQuery(lat, lon, 1000, true)]);
   const key = v => v.naturvernId || v.navn;
@@ -405,7 +458,8 @@ async function loadNatur(lat, lon){
 
   let h = inn.length ? vernItems(inn.map(v => Object.assign({}, v, {_d: 0}))) : (naer.length ? "" : `<div class="muted">Ingen registrerte verneområder</div>`);
   if(naer.length) h += `<div class="tier">Innen 1 km</div>` + vernItems(naer);
-  setCard("natur", h);
+  naturDeler.vern = h;
+  renderNatur();
   const erReservat = v => /reservat/i.test(v.verneform || "");
   kartListe.vern = n1000.map(v => {
     const i = info.get(key(v));
@@ -822,7 +876,9 @@ $("#e-close").addEventListener("click", () => {
 
 /* ---------- hovedflyt ---------- */
 function loading(){
-  ["sted","eiendom","natur","kultur"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
+  ["sted","eiendom","kultur"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
+  naturDeler.vern = naturDeler.typer = naturDeler.friluft = null;
+  renderNatur();
 }
 async function runAll(lat, lon, acc, fraAdresse){
   kartFraAdresse = !!fraAdresse;
@@ -835,7 +891,9 @@ async function runAll(lat, lon, acc, fraAdresse){
   showKart(lat, lon, acc);
   const jobs = [
     loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); setCard("kk", kommunekartHtml(lat, lon)); }),
-    loadNatur(lat, lon).catch(e => { setCard("natur", errHtml(e)); setTreff("vern", true); setTreff("reservat", true); }),
+    loadNatur(lat, lon).catch(e => { naturDeler.vern = errHtml(e); renderNatur(); setTreff("vern", true); setTreff("reservat", true); }),
+    loadNaturtyper(lat, lon).catch(e => { naturDeler.typer = errHtml(e); renderNatur(); }),
+    loadFriluft(lat, lon).catch(e => { naturDeler.friluft = errHtml(e); renderNatur(); }),
     loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
     sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true)),
     loadSpise(lat, lon).catch(() => setTreff("spise", false))
