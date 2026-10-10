@@ -159,6 +159,7 @@ body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
   <section class="card" id="c-sted"><h2>Sted</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-eiendom"><h2>Eiendom</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-eier"><h2>Eier</h2><div class="spin">…</div></section>
+  <section class="card" id="c-kk"><h2>Kommunekart</h2><div class="spin">…</div></section>
   <section class="card" id="c-mobil"><h2>Sjekk mobildekning</h2><div class="spin">…</div></section>
   <section class="card" id="c-natur"><h2>Natur og verneområder</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
@@ -330,6 +331,12 @@ async function loadSted(lat, lon){
   setCard("eier", `
     <div class="links"><a href="https://seeiendom.kartverket.no" target="_blank" rel="noopener">Se eiendom (Kartverket)</a></div>
     ${matrikkel ? `<div class="muted">Søk på matrikkelnummer: <b>${esc(matrikkel)}</b></div>` : ""}`);
+  setCard("kk", kommunekartHtml(lat, lon));
+}
+
+// Åpner Kommunekart (Norkart) på valgt posisjon. Hvilke kartlag som finnes der, styres av hver kommune.
+function kommunekartHtml(lat, lon){
+  return `<div class="links"><a href="https://kommunekart.com/?funksjon=vispunkt&x=${lat}&y=${lon}&zoom=17&bakgrunnskart=0" target="_blank" rel="noopener">Åpne Kommunekart her</a></div>`;
 }
 
 /* ---------- Mobildekning ---------- */
@@ -827,7 +834,7 @@ async function runAll(lat, lon, acc, fraAdresse){
   loadMobil();
   showKart(lat, lon, acc);
   const jobs = [
-    loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); }),
+    loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); setCard("kk", kommunekartHtml(lat, lon)); }),
     loadNatur(lat, lon).catch(e => { setCard("natur", errHtml(e)); setTreff("vern", true); setTreff("reservat", true); }),
     loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
     sjekkTur(lat, lon).then(t => setTreff("tur", t)).catch(() => setTreff("tur", true)),
