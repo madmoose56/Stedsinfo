@@ -683,12 +683,13 @@ function kulturItems(list){
   }).join("");
   return h;
 }
-async function loadKultur(lat, lon){
-  const dLat = 1050 / 110540;
-  const dLon = 1050 / (111320 * Math.cos(lat * Math.PI / 180));
+// Henter kulturminner innen R meter, sortert på avstand (maks 50 nærmeste)
+async function hentKultur(lat, lon, R){
+  const dLat = (R + 50) / 110540;
+  const dLon = (R + 50) / (111320 * Math.cos(lat * Math.PI / 180));
   const bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat].map(x => x.toFixed(6)).join(",");
-  // API-et tar med oppføringer uten geometri fra hele landet, så vi avgrenser til kommunene rundt (også kommuner 1 km unna)
-  const dl = 1000 / 110540, dn = 1000 / (111320 * Math.cos(lat * Math.PI / 180));
+  // API-et tar med oppføringer uten geometri fra hele landet, så vi avgrenser til kommunene rundt (også kommuner R meter unna)
+  const dl = R / 110540, dn = R / (111320 * Math.cos(lat * Math.PI / 180));
   const punkter = [[lat, lon], [lat + dl, lon], [lat - dl, lon], [lat, lon + dn], [lat, lon - dn]];
   const knr = await Promise.all(punkter.map(p =>
     getJson(`${API.kommune}?nord=${p[0]}&ost=${p[1]}&koordsys=4258`).then(k => k.kommunenummer).catch(() => null)));
@@ -698,7 +699,7 @@ async function loadKultur(lat, lon){
     const url = `${API.kultur}?f=json&limit=${LIMIT}&bbox=${bbox}&kommune=${kn}`;
     const first = await getJson(url, 40000);
     let fl = first.features || [];
-    const total = Math.min(first.numberMatched || 0, 4 * LIMIT);
+    const total = Math.min(first.numberMatched || 0, 6 * LIMIT);
     const rest = [];
     for(let off = LIMIT; off < total; off += LIMIT) rest.push(getJson(`${url}&offset=${off}`, 40000));
     (await Promise.all(rest)).forEach(r => { fl = fl.concat(r.features || []); });
@@ -706,20 +707,25 @@ async function loadKultur(lat, lon){
   };
   const feats = [].concat(...await Promise.all(kommuner.map(hent)));
   const seen = new Set();
-  const all = feats.map(f => {
+  return feats.map(f => {
     const p = f.properties || {};
     return {
       id: p.lokalId || f.id, navn: p.navn, d: geomDist(f.geometry, lat, lon), pt: nearestPt(f.geometry, lat, lon),
       vern: p.verneparagraf || p.vernetype || p.lokalitetsart,
       kommune: p.kommune, link: p["linkKulturminnesøk"]
     };
-  }).filter(k => isFinite(k.d) && k.d <= 1000 && !seen.has(k.id) && seen.add(k.id))
-    .sort((a, b) => a.d - b.d).slice(0, 50); // bare de 50 nærmeste
+  }).filter(k => isFinite(k.d) && k.d <= R && !seen.has(k.id) && seen.add(k.id))
+    .sort((x, y) => x.d - y.d).slice(0, 50);
+}
+async function loadKultur(lat, lon){
+  // først innen 1 km; er det færre enn 50 treff, utvides søket til 2 km (da blir de 50 nærmeste alltid riktige)
+  let all = await hentKultur(lat, lon, 1000);
+  if(all.length < 50) all = await hentKultur(lat, lon, 2000);
 
   all.forEach((k, i) => { k.nr = i + 1; });
-  const forste = all.slice(0, 3), resten = all.slice(3);
+  const forste = all.slice(0, 2), resten = all.slice(2);
   let h = all.length
-    ? `<div class="muted">Nærmeste kulturminner - innen 1 km</div>` + kulturItems(forste) +
+    ? `<div class="muted">Nærmeste kulturminner - innen 2 km</div>` + kulturItems(forste) +
       (resten.length ? `<div id="k-rest" hidden>${kulturItems(resten)}</div><button type="button" class="more" id="k-mer">Vis flere (${resten.length})</button>` : "")
     : `<div class="muted">Ingen registrerte kulturminner.</div>`;
   setCard("kultur", h);
