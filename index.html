@@ -546,14 +546,14 @@ function klokke(iso){
   return {hh, min: min <= 0 ? "nå" : min < 20 ? "om " + min + " min" : ""};
 }
 async function loadKollektiv(lat, lon){
-  const q = `{ nearest(latitude: ${lat}, longitude: ${lon}, maximumDistance: 800, maximumResults: 8, filterByPlaceTypes: [stopPlace]) {
+  const q = `{ nearest(latitude: ${lat}, longitude: ${lon}, maximumDistance: 500, maximumResults: 8, filterByPlaceTypes: [stopPlace]) {
     edges { node { distance place { ... on StopPlace { id name transportMode quays { publicCode wheelchairAccessible }
       estimatedCalls(numberOfDepartures: 4, timeRange: 7200) { expectedDepartureTime realtime cancellation
         destinationDisplay { frontText } serviceJourney { line { publicCode transportMode } } } } } } } } }`;
   const d = await enturSpor(q);
   const stopp = (d.nearest.edges || []).filter(e => e.node.place && e.node.place.name);
   if(!stopp.length){
-    setCard("kollektiv", `<div class="muted">Ingen holdeplasser innen 800 m.</div>`);
+    setCard("kollektiv", `<div class="muted">Ingen holdeplasser innen 500 m.</div>`);
     return;
   }
   const rad = e => {

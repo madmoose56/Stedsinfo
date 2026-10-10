@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v48).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v49).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -22,7 +22,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 ## Nye kort (v47)
 - **Arter i nærheten:** funn innen 500 m siste 5 år fra GBIF (api.gbif.org, bbox) og Artskart/Artsdatabanken (artskart.artsdatabanken.no/publicapi, `filter.wktPolygon`; trege svar, ofte 10–15 s; bbox-filteret virker ikke). Slått sammen, dublettfjernet, gruppert per art (rødlistede først), `<details>` med funn.
 - **Geologi, løsmasser og radon:** NGU WMS GetFeatureInfo (GML) i punktet: LosmasserWMS2/Losmasse_flate, BerggrunnWMS3/Berggrunn_lokal_hovedbergarter_fullzoom, RadonWMS2/Radon_aktsomhet.
-- **Kollektivtransport:** Entur Journey Planner v3 (api.entur.io/journey-planner/v3/graphql) med header `ET-Client-Name: madmoose56-stedsinfo`; nærmeste holdeplasser innen 800 m med sanntidsavganger og rullestoltilgang (Quay.wheelchairAccessible; Stop Place Register-API-et er stengt for oss). «Planlegg reise»-lenken (entur.no/reiseresultater?startLat&startLon) ble fjernet etter ønske.
+- **Kollektivtransport:** Entur Journey Planner v3 (api.entur.io/journey-planner/v3/graphql) med header `ET-Client-Name: madmoose56-stedsinfo`; nærmeste holdeplasser innen 500 m med sanntidsavganger og rullestoltilgang (Quay.wheelchairAccessible; Stop Place Register-API-et er stengt for oss). «Planlegg reise»-lenken (entur.no/reiseresultater?startLat&startLon) ble fjernet etter ønske.
 
 ## Kart
 - Fullskjerm av nederste kart åpnes alltid på radius 50 m, med valgene 50 m / 500 m / 1 km (vanlig visning: 100 m / 500 m / 1 km). Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
