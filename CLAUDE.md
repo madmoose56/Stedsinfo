@@ -9,11 +9,11 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v43).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v44).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
-- Finnes ikke som åpent landsdekkende kartlag (Geonorges WMS for reguleringsplaner svarer ikke; DiBK har bare nedlasting og «planlegging igangsatt»). Boksen «Plankart og reguleringsplan» har derfor to lenker: kommunens planregister `arealplaner.no/<kommunenavn><kommunenr>/arealplaner/search` (virker for Alta; Oslo er ikke registrert der) og Kommunekart på posisjonen (`funksjon=vispunkt&x=lat&y=lon`; kartlag for planer styres av hver kommune).
+- Ikke med i appen (fjernet etter ønske). Funn: finnes ikke som åpent landsdekkende kartlag; kommunenes planregister ligger på arealplaner.no, og Kommunekart kan åpnes på posisjon med `funksjon=vispunkt&x=lat&y=lon`.
 
 ## Kart
 - Fullskjerm av nederste kart åpnes alltid på radius 50 m, med valgene 50 m / 500 m / 1 km (vanlig visning: 100 m / 500 m / 1 km). Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
