@@ -118,7 +118,13 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
   box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
 .kart-hjorne{display:flex;align-items:flex-end;justify-content:space-between;gap:6px}
 body.kartfull .kart-fullbtn{display:none}
-body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
+body.kartfull #map .leaflet-bottom{margin-bottom:calc(env(safe-area-inset-bottom) + 54px)}
+/* i fullskjerm ligger alle filtervalgene nederst på kartet */
+body.kartfull #kart-valg{position:fixed;z-index:1002;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 8px);margin:0;
+  padding:0 8px;flex-wrap:nowrap;overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch}
+body.kartfull #kart-valg label{flex:none;background:#fff;color:#1c1f1a;font-size:13px;padding:6px 10px;gap:6px;
+  border:2px solid rgba(0,0,0,.3);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+body.kartfull #kart-valg input{width:16px;height:16px}
 .kart-radius-box{display:flex;flex-direction:column;gap:6px}
 .seg{display:flex;margin:4px 0 12px;border:1px solid var(--accent);border-radius:12px;overflow:hidden}
 .seg button{flex:1;border:0;background:var(--card);color:var(--accent);padding:12px 8px;font-weight:600}
@@ -1015,8 +1021,7 @@ function drawKart(){
   const rad = kartRadius === 1000 ? "1 km" : kartRadius + " m";
   if(kartBtn){
     kartBtn.innerHTML = "";
-    // i fullskjerm er valgene 50 m / 500 m / 1 km, ellers 100 m / 500 m / 1 km
-    (document.body.classList.contains("kartfull") ? [50, 500, 1000] : [100, 500, 1000]).filter(r => r !== kartRadius).forEach(r => {
+    [100, 500, 1000].filter(r => r !== kartRadius).forEach(r => {
       const b = L.DomUtil.create("button", "kart-radius", kartBtn);
       b.type = "button";
       b.textContent = r === 1000 ? "1 km" : r + " m";
@@ -1045,8 +1050,8 @@ function kartFull(on){
   if(on){ kartFullView = [map.getCenter(), map.getZoom()]; kartRadiusFor = kartRadius; }
   document.body.classList.toggle("kartfull", on);
   map.invalidateSize({pan: false});
-  // fullskjerm starter alltid på 50 m; når man går tilbake gjenopprettes radius og utsnitt
-  kartRadius = on ? 50 : kartRadiusFor;
+  // fullskjerm starter på 100 m; når man går tilbake gjenopprettes radius og utsnitt
+  kartRadius = on ? 100 : kartRadiusFor;
   drawKart();
   if(!on && kartFullView){ map.setView(kartFullView[0], kartFullView[1], {animate: false}); }
 }
