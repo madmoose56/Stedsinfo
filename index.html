@@ -552,9 +552,8 @@ async function loadKollektiv(lat, lon){
         destinationDisplay { frontText } serviceJourney { line { publicCode transportMode } } } } } } } } }`;
   const d = await enturSpor(q);
   const stopp = (d.nearest.edges || []).filter(e => e.node.place && e.node.place.name);
-  const planlegg = `https://entur.no/reiseresultater?tripMode=oneway&startLat=${lat}&startLon=${lon}`;
   if(!stopp.length){
-    setCard("kollektiv", `<div class="muted">Ingen holdeplasser innen 800 m.</div><div class="links"><a href="${planlegg}" target="_blank" rel="noopener">Planlegg reise (Entur)</a></div>`);
+    setCard("kollektiv", `<div class="muted">Ingen holdeplasser innen 800 m.</div>`);
     return;
   }
   const rad = e => {
@@ -570,7 +569,6 @@ async function loadKollektiv(lat, lon){
   };
   const f = stopp.slice(0, 3), r = stopp.slice(3);
   let h = f.map(rad).join("") + (r.length ? `<div id="nr-stopp" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="stopp">Vis flere (${r.length})</button>` : "");
-  h += `<div class="links" style="margin-top:8px"><a href="${planlegg}" target="_blank" rel="noopener">Planlegg reise fra her (Entur)</a></div>`;
   setCard("kollektiv", h);
 }
 
