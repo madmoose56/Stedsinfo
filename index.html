@@ -1140,22 +1140,13 @@ function showKart(lat, lon, acc){
 }
 
 let kartFullView = null;
-let kartRadiusFor = 100, valgFor = null;
+let kartRadiusFor = 100;
 function kartFull(on){
   if(!map) return;
   if(!on) kartKunTreff = null;
-  const bokser = [...document.querySelectorAll("#kart-valg input")];
-  if(on){
-    // i fullskjerm er alle valg avkrysset automatisk; forrige avkrysning gjenopprettes ved «Tilbake»
-    valgFor = bokser.map(b => b.checked);
-    bokser.forEach(b => { b.checked = true; });
-    document.body.classList.remove("valg-open");
-  } else if(kartTreffMark){ kartTreffMark.clearLayers(); }
-  if(!on && valgFor){
-    bokser.forEach((b, i) => { b.checked = valgFor[i]; });
-    saveKartPrefs();
-    document.body.classList.remove("valg-open");
-  }
+  // valgene (avkrysningene) er de samme i det lille kartet og i fullskjerm: det du velger ett sted gjelder begge
+  document.body.classList.remove("valg-open");
+  if(!on && kartTreffMark) kartTreffMark.clearLayers();
   updateKartValg();
   if(on){ kartFullView = [map.getCenter(), map.getZoom()]; kartRadiusFor = kartRadius; }
   document.body.classList.toggle("kartfull", on);
