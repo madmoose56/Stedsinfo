@@ -821,7 +821,7 @@ function drawPunkt(){
     g.clearLayers();
     const p = PUNKT[k];
     (kartListe[k] || []).forEach(x => {
-      if(!x.pt || x.d > kartRadius) return;
+      if(!x.pt || !iUtsnitt(x.pt)) return;
       g.addLayer(L.marker(x.pt, {icon: L.divIcon({className: "", iconSize: [0, 0],
         html: `<div class="kmark ${p.cls}">${p.pre}${x.nr}${x.navn ? `<span class="mlab">${esc(kort(x.navn))}</span>` : ""}</div>`})})
         .bindPopup(`<b>${p.pre}${x.nr} ${esc(x.navn || "")}</b>${x.art ? "<br>" + esc(x.art) : ""}<br>${x.d < 1 ? "Her" : fmtDist(x.d)}`));
@@ -833,7 +833,7 @@ function drawSpiseMarks(){
   if(!map || !kartLag.spise) return;
   kartLag.spise.clearLayers();
   kartListe.spise.forEach(x => {
-    if(x.d > kartRadius) return;
+    if(!iUtsnitt(x.pt)) return;
     kartLag.spise.addLayer(L.marker(x.pt, {icon: L.divIcon({className: "", html: `<div class="smark">🍴${x.navn ? `<span class="mlab">${esc(kort(x.navn))}</span>` : ""}</div>`, iconSize: [0, 0]})})
       .bindPopup(`<b>${esc(x.navn || x.art)}</b><br>${esc(x.navn ? x.art : "")}${x.mat ? " · " + esc(x.mat.replace(/;/g, ", ")) : ""}<br>${fmtDist(x.d)}`));
   });
@@ -864,6 +864,8 @@ function drawVernPolys(){
 // treff som brukes til K1, K2 … på kartet
 const kartListe = {kultur: [], vern: [], spise: [], hold: [], arter: [], ntyp: [], friluft: []};
 let kartK = null;
+// punkt innenfor det synlige kartutsnittet (litt margin), så 100 m-visningen også får med treff i hjørnene
+function iUtsnitt(pt){ return !!map && map.getBounds().pad(0.15).contains(pt); }
 function kort(t){ return t.length > 22 ? t.slice(0, 21) + "…" : t; }
 function drawKultMarks(){
   if(!map) return;
@@ -871,7 +873,7 @@ function drawKultMarks(){
   kartK.clearLayers();
   if(kartTreff.kultur !== true || !$('#kart-valg input[data-layer="kultur"]').checked) return;
   kartListe.kultur.forEach(k => {
-    if(!k.pt || k.d > kartRadius) return;
+    if(!k.pt || !iUtsnitt(k.pt)) return;
     kartK.addLayer(L.marker(k.pt, {icon: L.divIcon({className: "", html: `<div class="kmark">K${k.nr}${k.navn ? `<span class="mlab">${esc(kort(k.navn))}</span>` : ""}</div>`, iconSize: [0, 0]})})
       .bindPopup(`<b>K${k.nr} ${esc(k.navn || "(uten navn)")}</b><br>${fmtDist(k.d)}`));
   });
@@ -993,6 +995,7 @@ function initMap(){
   // navn ved markørene vises bare når kartet er zoomet nok inn
   const toggleLab = () => $("#map").classList.toggle("nolab", map.getZoom() < 16);
   map.on("zoomend", toggleLab);
+  map.on("zoomend", () => { if(!map._popup) { drawKultMarks(); drawSpiseMarks(); } });
   toggleLab();
   return true;
 }
