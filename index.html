@@ -58,6 +58,18 @@ a{color:var(--accent)}
 .links.rad{display:flex;gap:6px}
 .links.rad a{flex:1;min-width:0;margin:4px 0;padding:8px 4px;display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap}
 .links a .op{width:22px;height:22px;vertical-align:middle;margin:0 6px 0 0;flex:none}
+.avg{display:flex;gap:8px;align-items:baseline;padding:2px 0;font-size:15px}
+.avg .t{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px}
+.avg .l{font-weight:700;min-width:34px}
+.sanntid{color:#15803d;font-size:12px;font-weight:700}
+.art{border-top:1px solid var(--line);padding:6px 0}
+.art:first-of-type{border-top:0}
+.art summary{cursor:pointer;list-style:none}
+.art summary::-webkit-details-marker{display:none}
+.art summary .n{font-weight:600}
+.art .funn{padding:6px 0 2px 10px;border-left:3px solid var(--line);margin:6px 0 4px 2px;font-size:14px}
+.art .funn+.funn{border-top:1px dashed var(--line);margin-top:0}
+.rl{display:inline-block;margin-left:6px;padding:0 6px;border-radius:6px;font-size:12px;font-weight:700;background:#fde68a;color:#78350f}
 .kbadge{display:inline-block;background:#c2410c;color:#fff;border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700}
 .mlab{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:4px;pointer-events:none;
   font:600 11px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;color:#1c1f1a;white-space:nowrap;
@@ -160,8 +172,11 @@ body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
   <section class="card" id="c-eiendom"><h2>Eiendom</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-eier"><h2>Eier</h2><div class="spin">…</div></section>
   <section class="card" id="c-kk"><h2>Kommunekart</h2><div class="spin">…</div></section>
+  <section class="card" id="c-kollektiv"><h2>Kollektivtransport</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-mobil"><h2>Sjekk mobildekning</h2><div class="spin">…</div></section>
   <section class="card" id="c-natur"><h2>Natur</h2><div class="spin">Henter …</div></section>
+  <section class="card" id="c-geo"><h2>Geologi, løsmasser og radon</h2><div class="spin">Henter …</div></section>
+  <section class="card" id="c-arter"><h2>Registrerte observasjoner av arter i nærheten</h2><div class="spin">Henter …</div></section>
   <section class="card" id="c-kultur"><h2>Kulturminner</h2><div class="spin">Henter …</div></section>
 
   <section class="card" id="c-kart">
@@ -180,7 +195,7 @@ body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
 
   <footer>
     Kilder: Kartverket (adresser, kommuneinfo, kart og matrikkelkart), Miljødirektoratet (Naturbase verneområder),
-    Riksantikvaren (Askeladden/Kulturminnesøk), OpenStreetMap (spisesteder). Data er veiledende, ikke juridisk bindende.
+    Riksantikvaren (Askeladden/Kulturminnesøk), OpenStreetMap (spisesteder), Artsdatabanken/Artskart og GBIF (arter), NGU (geologi og radon), Entur (kollektivtransport), Kartverket (høyde). Data er veiledende, ikke juridisk bindende.
     Tips: legg til <code>#59.9139,10.7522</code> i adressen for å teste en annen posisjon.
   </footer>
 </main>
@@ -469,6 +484,176 @@ async function loadNatur(lat, lon){
   drawVernPolys();
   setTreff("vern", kartListe.vern.some(x => x.type === "vern"));
   setTreff("reservat", kartListe.vern.some(x => x.type === "reservat"));
+}
+
+/* ---------- Geologi, løsmasser og radon (NGU) ---------- */
+function gmlFelt(xml, navn){
+  const m = new RegExp("<" + navn + ">([^<]*)</" + navn + ">").exec(xml);
+  return m ? m[1].trim() : "";
+}
+// WMS GetFeatureInfo i ett punkt (GML) mot NGUs kartlag
+async function nguPunkt(tjeneste, lag, lat, lon){
+  const x = lon * 20037508.34 / 180, y = Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * 6378137, r = 30;
+  const url = `https://geo.ngu.no/mapserver/${tjeneste}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetFeatureInfo&LAYERS=${lag}&QUERY_LAYERS=${lag}&STYLES=&CRS=EPSG:3857` +
+    `&BBOX=${x - r},${y - r},${x + r},${y + r}&WIDTH=101&HEIGHT=101&I=50&J=50&INFO_FORMAT=application/vnd.ogc.gml&FEATURE_COUNT=1`;
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 20000);
+  try{
+    const resp = await fetch(url, {signal: ctl.signal});
+    if(!resp.ok) throw new Error("HTTP " + resp.status);
+    return await resp.text();
+  } finally { clearTimeout(t); }
+}
+async function loadGeo(lat, lon){
+  const [lm, berg, radon] = await Promise.allSettled([
+    nguPunkt("LosmasserWMS2", "Losmasse_flate", lat, lon),
+    nguPunkt("BerggrunnWMS3", "Berggrunn_lokal_hovedbergarter_fullzoom", lat, lon),
+    nguPunkt("RadonWMS2", "Radon_aktsomhet", lat, lon)
+  ]);
+  if(lm.status === "rejected" && berg.status === "rejected" && radon.status === "rejected") throw lm.reason;
+  const ut = r => r.status === "fulfilled" ? r.value : "";
+  const lmTekst = gmlFelt(ut(lm), "losmassetype_tekst"), lmDef = gmlFelt(ut(lm), "losmassetype_definisjon");
+  const bergart = gmlFelt(ut(berg), "hovedbergart_tekst"), enhet = gmlFelt(ut(berg), "bergartsenhet_tekst");
+  const rad = gmlFelt(ut(radon), "aktsomhetgrad_besk");
+  const rader = [
+    ["Løsmasser", lmTekst || (lm.status === "fulfilled" ? "Ingen kartlagt her" : "Utilgjengelig")],
+    ["Berggrunn", bergart || (berg.status === "fulfilled" ? "Ingen kartlagt her" : "Utilgjengelig")],
+    ["Bergartsenhet", enhet && enhet !== bergart ? enhet : null],
+    ["Radon, aktsomhet", rad || (radon.status === "fulfilled" ? "Ingen opplysning her" : "Utilgjengelig")]
+  ];
+  let h = rows(rader);
+  if(lmDef) h += `<div class="muted" style="margin-top:8px">${esc(lmTekst)}: ${esc(lmDef)}</div>`;
+  h += `<div class="muted" style="margin-top:6px">Kilde: NGU (Norges geologiske undersøkelse). Radon-kartet er et aktsomhetskart, ikke en måling.</div>`;
+  setCard("geo", h);
+}
+
+/* ---------- Kollektivtransport (Entur Journey Planner) ---------- */
+const TRANS_IKON = {bus: "\u{1F68C}", coach: "\u{1F68C}", tram: "\u{1F68B}", metro: "\u{1F687}", rail: "\u{1F686}", water: "\u26F4\uFE0F", air: "\u2708\uFE0F", cableway: "\u{1F6A1}", funicular: "\u{1F6A0}", lift: "\u{1F6A1}"};
+async function enturSpor(query){
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 20000);
+  try{
+    const resp = await fetch("https://api.entur.io/journey-planner/v3/graphql", {method: "POST", signal: ctl.signal,
+      headers: {"Content-Type": "application/json", "ET-Client-Name": "madmoose56-stedsinfo"}, body: JSON.stringify({query})});
+    if(!resp.ok) throw new Error("HTTP " + resp.status);
+    const d = await resp.json();
+    if(d.errors) throw new Error(d.errors[0].message);
+    return d.data;
+  } finally { clearTimeout(t); }
+}
+function klokke(iso){
+  const t = new Date(iso);
+  const hh = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0");
+  const min = Math.round((t - Date.now()) / 60000);
+  return {hh, min: min <= 0 ? "nå" : min < 20 ? "om " + min + " min" : ""};
+}
+async function loadKollektiv(lat, lon){
+  const q = `{ nearest(latitude: ${lat}, longitude: ${lon}, maximumDistance: 800, maximumResults: 8, filterByPlaceTypes: [stopPlace]) {
+    edges { node { distance place { ... on StopPlace { id name transportMode quays { publicCode wheelchairAccessible }
+      estimatedCalls(numberOfDepartures: 4, timeRange: 7200) { expectedDepartureTime realtime cancellation
+        destinationDisplay { frontText } serviceJourney { line { publicCode transportMode } } } } } } } } }`;
+  const d = await enturSpor(q);
+  const stopp = (d.nearest.edges || []).filter(e => e.node.place && e.node.place.name);
+  const planlegg = `https://entur.no/reiseresultater?tripMode=oneway&startLat=${lat}&startLon=${lon}`;
+  if(!stopp.length){
+    setCard("kollektiv", `<div class="muted">Ingen holdeplasser innen 800 m.</div><div class="links"><a href="${planlegg}" target="_blank" rel="noopener">Planlegg reise (Entur)</a></div>`);
+    return;
+  }
+  const rad = e => {
+    const p = e.node.place, ikon = (p.transportMode || []).map(m => TRANS_IKON[m] || "").join(" ");
+    const ok = p.quays.filter(x => x.wheelchairAccessible === "possible").length;
+    const tilg = ok ? `Rullestol mulig på ${ok} av ${p.quays.length} plattformer` : "Ingen opplysninger om tilgjengelighet";
+    const avg = (p.estimatedCalls || []).filter(c => !c.cancellation).slice(0, 3).map(c => {
+      const k = klokke(c.expectedDepartureTime);
+      return `<div class="avg"><span class="t">${k.hh}</span><span class="l">${esc(c.serviceJourney.line.publicCode || "")}</span>` +
+        `<span>${esc(c.destinationDisplay.frontText)}</span>${c.realtime ? '<span class="sanntid">sanntid</span>' : ""}${k.min ? `<span class="muted">${k.min}</span>` : ""}</div>`;
+    }).join("") || `<div class="muted">Ingen avganger de neste to timene.</div>`;
+    return `<div class="item"><span class="dist">${fmtDist(e.node.distance)}</span><div class="n">${ikon} ${esc(p.name)}</div>${avg}<div class="muted">${tilg}</div></div>`;
+  };
+  const f = stopp.slice(0, 3), r = stopp.slice(3);
+  let h = f.map(rad).join("") + (r.length ? `<div id="nr-stopp" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="stopp">Vis flere (${r.length})</button>` : "");
+  h += `<div class="links" style="margin-top:8px"><a href="${planlegg}" target="_blank" rel="noopener">Planlegg reise fra her (Entur)</a></div>`;
+  setCard("kollektiv", h);
+}
+
+/* ---------- Arter: observasjoner fra Artskart (Artsdatabanken) og GBIF ---------- */
+const RODLISTE = {RE: "Regionalt utdødd", CR: "Kritisk truet", EN: "Sterkt truet", VU: "Sårbar", NT: "Nær truet"};
+function datoNo(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${m[3]}.${m[2]}.${m[1]}` : (iso || "ukjent dato"); }
+async function loadArter(lat, lon){
+  const R = 500, aar = new Date().getFullYear(), fra = aar - 4;
+  const dLa = R / 110540, dLo = R / (111320 * Math.cos(lat * Math.PI / 180));
+  const f5 = x => x.toFixed(5);
+  const gUrl = `https://api.gbif.org/v1/occurrence/search?decimalLatitude=${f5(lat - dLa)},${f5(lat + dLa)}&decimalLongitude=${f5(lon - dLo)},${f5(lon + dLo)}` +
+    `&year=${fra},${aar}&hasCoordinate=true&occurrenceStatus=PRESENT&limit=300`;
+  const wkt = `POLYGON((${f5(lon - dLo)} ${f5(lat - dLa)},${f5(lon + dLo)} ${f5(lat - dLa)},${f5(lon + dLo)} ${f5(lat + dLa)},${f5(lon - dLo)} ${f5(lat + dLa)},${f5(lon - dLo)} ${f5(lat - dLa)}))`;
+  const aUrl = `https://artskart.artsdatabanken.no/publicapi/api/observations/list?pageSize=100&pageIndex=0&crs=EPSG:4326&filter.crs=EPSG:4326` +
+    `&filter.fromDate=${fra}-01-01&filter.wktPolygon=${encodeURIComponent(wkt)}`;
+  const [g, a] = await Promise.allSettled([getJson(gUrl, 30000), getJson(aUrl, 45000)]);
+  if(g.status === "rejected" && a.status === "rejected") throw g.reason;
+  const obs = [];
+  if(g.status === "fulfilled") (g.value.results || []).forEach(r => {
+    if(r.decimalLatitude == null || r.decimalLongitude == null) return;
+    if(r.coordinateUncertaintyInMeters != null && r.coordinateUncertaintyInMeters > 250) return;
+    obs.push({sci: r.species || r.scientificName || "", navn: r.vernacularName || "", dato: (r.eventDate || "").slice(0, 10),
+      av: r.recordedBy || "", sted: r.locality || "", antall: r.individualCount, kilde: "GBIF",
+      info: r.datasetName || r.institutionCode || "", url: "https://www.gbif.org/occurrence/" + r.key,
+      status: "", la: r.decimalLatitude, lo: r.decimalLongitude});
+  });
+  if(a.status === "fulfilled") (a.value.Observations || []).forEach(o => {
+    const la = parseFloat(String(o.Latitude).replace(",", ".")), lo = parseFloat(String(o.Longitude).replace(",", "."));
+    if(!isFinite(la) || !isFinite(lo)) return;
+    if(parseFloat(o.Precision) > 250) return;
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(o.CollectedDate || "");
+    obs.push({sci: o.ScientificName || "", navn: o.Name || "", dato: m ? `${m[3]}-${m[2]}-${m[1]}` : "",
+      av: o.Collector || "", sted: o.Locality || "", antall: o.Count, kilde: "Artskart",
+      info: o.Institution || o.Collection || "", url: o.DetailUrl || o.ObsUrl || "", status: o.Status || "", la, lo});
+  });
+  // avstand, filtrering og fjerning av dubletter (samme art, dato og sted fra begge kilder)
+  const seen = new Map(), liste = [];
+  obs.forEach(o => {
+    const p = proj(o.lo, o.la, lon, lat);
+    o.d = Math.hypot(p[0], p[1]);
+    if(!o.sci || o.d > R) return;
+    const nok = [o.sci.toLowerCase(), o.dato, o.la.toFixed(3), o.lo.toFixed(3)].join("|");
+    const eks = seen.get(nok);
+    if(eks){ if(eks.kilde !== o.kilde) eks.kilde = "Artskart og GBIF"; if(!eks.status && o.status) eks.status = o.status; if(!eks.navn) eks.navn = o.navn; return; }
+    seen.set(nok, o);
+    liste.push(o);
+  });
+  const arter = new Map();
+  liste.forEach(o => {
+    const k = o.sci.toLowerCase();
+    if(!arter.has(k)) arter.set(k, {sci: o.sci, navn: "", status: "", funn: []});
+    const g2 = arter.get(k);
+    if(!g2.navn && o.navn && o.navn.toLowerCase() !== o.sci.toLowerCase()) g2.navn = o.navn;
+    if(!g2.status && o.status) g2.status = o.status;
+    g2.funn.push(o);
+  });
+  const grupper = [...arter.values()];
+  grupper.forEach(x => {
+    x.funn.sort((p, q) => (q.dato || "").localeCompare(p.dato || ""));
+    x.sist = x.funn[0].dato;
+    x.naer = Math.min(...x.funn.map(f => f.d));
+  });
+  // rødlistede arter først, så nyeste funn
+  grupper.sort((p, q) => (RODLISTE[q.status] ? 1 : 0) - (RODLISTE[p.status] ? 1 : 0) || (q.sist || "").localeCompare(p.sist || ""));
+  const kilder = [g.status === "fulfilled" ? "GBIF" : null, a.status === "fulfilled" ? "Artskart" : null].filter(Boolean).join(" og ");
+  let h;
+  if(!grupper.length){
+    h = `<div class="muted">Ingen funn registrert innen ${R} m siden ${fra}.</div>`;
+  } else {
+    const rad = x => {
+      const rl = RODLISTE[x.status] ? `<span class="rl">${RODLISTE[x.status]}</span>` : "";
+      const funn = x.funn.slice(0, 8).map(f => `<div class="funn">${datoNo(f.dato)} · ${fmtDist(f.d)}${f.antall ? " · " + esc(f.antall) + " stk." : ""}<br>` +
+        `<span class="muted">${[f.av && "Observert av " + esc(f.av), f.sted && esc(f.sted), esc(f.kilde) + (f.info ? " (" + esc(f.info) + ")" : "")].filter(Boolean).join(" · ")}</span>` +
+        `${safeUrl(f.url) ? ` · <a href="${esc(f.url)}" target="_blank" rel="noopener">Se funnet</a>` : ""}</div>`).join("");
+      return `<details class="art"><summary><span class="dist">${fmtDist(x.naer)}</span><span class="n">${esc(x.navn || x.sci)}</span>${rl}<br>` +
+        `<span class="muted">${x.navn ? "<i>" + esc(x.sci) + "</i> · " : ""}${x.funn.length} funn · sist ${datoNo(x.sist)}</span></summary>${funn}${x.funn.length > 8 ? `<div class="muted">… og ${x.funn.length - 8} funn til</div>` : ""}</details>`;
+    };
+    const vis = grupper.slice(0, 40), f = vis.slice(0, 5), r = vis.slice(5);
+    h = `<div class="muted">${liste.length} funn av ${grupper.length} arter innen ${R} m, siste 5 år. Trykk på en art for funnene.</div>` + f.map(rad).join("") +
+      (r.length ? `<div id="nr-arter" hidden>${r.map(rad).join("")}</div><button type="button" class="more" data-vis="arter">Vis flere (${r.length})</button>` : "") +
+      `<div class="muted" style="margin-top:6px">Kilder: ${esc(kilder)}. Utvalg av funn, ikke en komplett liste.</div>`;
+  }
+  setCard("arter", h);
 }
 
 /* ---------- Kulturminner ---------- */
@@ -876,7 +1061,7 @@ $("#e-close").addEventListener("click", () => {
 
 /* ---------- hovedflyt ---------- */
 function loading(){
-  ["sted","eiendom","kultur"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
+  ["sted","eiendom","kultur","arter","geo","kollektiv"].forEach(id => setCard(id, `<div class="spin">Henter …</div>`));
   naturDeler.vern = naturDeler.typer = naturDeler.friluft = null;
   renderNatur();
 }
@@ -892,6 +1077,9 @@ async function runAll(lat, lon, acc, fraAdresse){
   const jobs = [
     loadSted(lat, lon).catch(e => { setCard("sted", errHtml(e)); setCard("eiendom", errHtml(e)); setCard("eier", `<div class="muted">Eier er ikke åpne data.</div>`); setCard("kk", kommunekartHtml(lat, lon)); }),
     loadNatur(lat, lon).catch(e => { naturDeler.vern = errHtml(e); renderNatur(); setTreff("vern", true); setTreff("reservat", true); }),
+    loadArter(lat, lon).catch(e => setCard("arter", errHtml(e))),
+    loadGeo(lat, lon).catch(e => setCard("geo", errHtml(e))),
+    loadKollektiv(lat, lon).catch(e => setCard("kollektiv", errHtml(e))),
     loadNaturtyper(lat, lon).catch(e => { naturDeler.typer = errHtml(e); renderNatur(); }),
     loadFriluft(lat, lon).catch(e => { naturDeler.friluft = errHtml(e); renderNatur(); }),
     loadKultur(lat, lon).catch(e => { setCard("kultur", errHtml(e)); setTreff("kultur", true); }),
