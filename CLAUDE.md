@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v60).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v61).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -35,6 +35,10 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Åpne/lukke temaer
 - Alle temakort unntatt Sted og Kart har en pil (chevron) i overskriften og kan åpnes/lukkes; de er lukket som standard, og valget huskes per kort i localStorage (`stedsinfo-apne`). Liste i `KAN_LUKKES`.
+
+## Parkering (P1…)
+- Kortet «Parkering» (under Kollektivtransport): parkeringsplasser innen 500 m fra OpenStreetMap (`amenity=parking`, via Overpass; gateparkering og private plasser er utelatt), med type, antall plasser, avgift, HC- og ladeplasser når det er registrert. Har kart-valg «Parkering» med P-merker, «Kart»-knapp og er åpne/lukke-bart som de andre temaene.
+- Klassenavn på merkene er kh/kp/ka/kn/kf (ikke enkeltbokstaver: `.f` er skjemastil og ga en grønn stripe i Friluftslivsområder). Friluftslivsområder har avstanden på beskrivelseslinjen, nede til høyre.
 
 ## Kart
 - Fullskjerm av nederste kart: starter på 100 m med radiusvalgene 100 m / 500 m / 1 km (som vanlig visning). Filtervalgene ligger i en meny som trekkes ut fra høyre side med håndtaket «Vis»; alle valg krysses av automatisk når fullskjermen åpnes (forrige avkrysning gjenopprettes ved «Tilbake»), og et trykk på kartet lukker menyen. Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
