@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v52).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v53).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -26,6 +26,9 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Fjernet
 - Boksen «Sjekk mobildekning» (lenker til Telenor/Telia/Ice) er fjernet etter ønske; det finnes ingen åpen tjeneste for dekning i et punkt.
+
+## Nummererte punkter på kartet
+- Avkrysninger for Holdeplasser (H1…), Arter (A1…), Naturtyper (N1…) og Friluftsliv (F1…), i tillegg til Kulturminner (K1…). Samme nummer står i kortene. Vises bare når laget har treff, er avkrysset og punktet er innenfor valgt radius; navn ved zoom ≥ 16. Arter: én markør per art ved nærmeste funn. Polygoner (natur/friluft) får punkt ved nærmeste hjørne, eller midten av omrisset hvis man står i dem.
 
 ## Kart
 - Fullskjerm av nederste kart åpnes alltid på radius 50 m, med valgene 50 m / 500 m / 1 km (vanlig visning: 100 m / 500 m / 1 km). Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
