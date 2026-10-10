@@ -118,13 +118,19 @@ footer{color:var(--muted);font-size:12px;padding:8px 4px}
   box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:pointer}
 .kart-hjorne{display:flex;align-items:flex-end;justify-content:space-between;gap:6px}
 body.kartfull .kart-fullbtn{display:none}
-body.kartfull #map .leaflet-bottom{margin-bottom:calc(env(safe-area-inset-bottom) + 54px)}
-/* i fullskjerm ligger alle filtervalgene nederst på kartet */
-body.kartfull #kart-valg{position:fixed;z-index:1002;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 8px);margin:0;
-  padding:0 8px;flex-wrap:nowrap;overflow-x:auto;gap:6px;-webkit-overflow-scrolling:touch}
-body.kartfull #kart-valg label{flex:none;background:#fff;color:#1c1f1a;font-size:13px;padding:6px 10px;gap:6px;
-  border:2px solid rgba(0,0,0,.3);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
-body.kartfull #kart-valg input{width:16px;height:16px}
+body.kartfull #map .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
+/* i fullskjerm ligger filtervalgene i en meny som trekkes ut fra høyre side (håndtak «Vis») */
+#valg-handle{display:none}
+body.kartfull #kart-valg{position:fixed;z-index:1002;right:0;top:50%;left:auto;bottom:auto;margin:0;
+  transform:translate(100%,-50%);transition:transform .25s ease;flex-direction:column;flex-wrap:nowrap;gap:8px;
+  padding:12px 12px 12px 14px;background:#fff;border:2px solid rgba(0,0,0,.3);border-right:0;border-radius:12px 0 0 12px;
+  box-shadow:0 1px 6px rgba(0,0,0,.3)}
+body.kartfull.valg-open #kart-valg{transform:translate(0,-50%)}
+body.kartfull #valg-handle{display:block;position:absolute;left:-52px;top:50%;transform:translateY(-50%);width:50px;
+  padding:14px 4px;background:#fff;color:#14532d;font:700 14px/1 -apple-system,BlinkMacSystemFont,sans-serif;
+  border:2px solid rgba(0,0,0,.3);border-right:0;border-radius:10px 0 0 10px;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+body.kartfull #kart-valg label{background:#fff;color:#1c1f1a;font-size:15px;padding:6px 8px;gap:8px;border:1px solid var(--line);border-radius:8px}
+body.kartfull #kart-valg input{width:18px;height:18px}
 .kart-radius-box{display:flex;flex-direction:column;gap:6px}
 .seg{display:flex;margin:4px 0 12px;border:1px solid var(--accent);border-radius:12px;overflow:hidden}
 .seg button{flex:1;border:0;background:var(--card);color:var(--accent);padding:12px 8px;font-weight:600}
@@ -192,6 +198,7 @@ body.kartfull #kart-valg input{width:16px;height:16px}
   <section class="card" id="c-kart">
     <h2>Kart</h2>
     <div class="toggles" id="kart-valg">
+      <button type="button" id="valg-handle">Vis</button>
       <label><input type="checkbox" data-layer="kultur"> Kulturminner</label>
       <label><input type="checkbox" data-layer="vern"> Verneområde</label>
       <label><input type="checkbox" data-layer="reservat"> Naturreservat</label>
@@ -1001,6 +1008,7 @@ function initMap(){
   // navn ved markørene vises bare når kartet er zoomet nok inn
   const toggleLab = () => $("#map").classList.toggle("nolab", map.getZoom() < 16);
   map.on("zoomend", toggleLab);
+  map.on("click", () => document.body.classList.remove("valg-open")); // trykk på kartet lukker menyen
   map.on("zoomend", () => { if(!map._popup) { drawKultMarks(); drawSpiseMarks(); } });
   toggleLab();
   return true;
@@ -1044,9 +1052,21 @@ function showKart(lat, lon, acc){
 }
 
 let kartFullView = null;
-let kartRadiusFor = 100;
+let kartRadiusFor = 100, valgFor = null;
 function kartFull(on){
   if(!map) return;
+  const bokser = [...document.querySelectorAll("#kart-valg input")];
+  if(on){
+    // i fullskjerm er alle valg avkrysset automatisk; forrige avkrysning gjenopprettes ved «Tilbake»
+    valgFor = bokser.map(b => b.checked);
+    bokser.forEach(b => { b.checked = true; });
+    document.body.classList.remove("valg-open");
+  } else if(valgFor){
+    bokser.forEach((b, i) => { b.checked = valgFor[i]; });
+    saveKartPrefs();
+    document.body.classList.remove("valg-open");
+  }
+  updateKartValg();
   if(on){ kartFullView = [map.getCenter(), map.getZoom()]; kartRadiusFor = kartRadius; }
   document.body.classList.toggle("kartfull", on);
   map.invalidateSize({pan: false});
@@ -1056,6 +1076,7 @@ function kartFull(on){
   if(!on && kartFullView){ map.setView(kartFullView[0], kartFullView[1], {animate: false}); }
 }
 $("#kart-close").addEventListener("click", () => kartFull(false));
+$("#valg-handle").addEventListener("click", () => document.body.classList.toggle("valg-open"));
 
 /* ---------- eiendomskart i full størrelse ---------- */
 let eiendomInfo = null, emap = null, eRadius = 100, eLayers = [], eBtns = null;

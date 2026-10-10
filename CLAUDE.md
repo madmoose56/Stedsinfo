@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v57).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v58).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -31,7 +31,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 - Avkrysninger for Holdeplasser (H1…), Arter (A1…), Naturtyper (N1…) og Friluftsliv (F1…), i tillegg til Kulturminner (K1…). Samme nummer står i kortene. Vises bare når laget har treff, er avkrysset og punktet ligger i det synlige kartutsnittet (med litt margin; ikke bare innenfor radiussirkelen, slik at 100 m-visningen også får med hjørnene); navn ved zoom ≥ 16. Arter: én markør per art ved nærmeste funn. Polygoner (natur/friluft) får punkt ved nærmeste hjørne, eller midten av omrisset hvis man står i dem.
 
 ## Kart
-- Fullskjerm av nederste kart: starter på 100 m med radiusvalgene 100 m / 500 m / 1 km (som vanlig visning). Alle filtervalgene (Kulturminner, Turstier osv.) ligger i en rad nederst på kartet (kan scrolles sideveis). Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
+- Fullskjerm av nederste kart: starter på 100 m med radiusvalgene 100 m / 500 m / 1 km (som vanlig visning). Filtervalgene ligger i en meny som trekkes ut fra høyre side med håndtaket «Vis»; alle valg krysses av automatisk når fullskjermen åpnes (forrige avkrysning gjenopprettes ved «Tilbake»), og et trykk på kartet lukker menyen. Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
 - Bunnkart-bytte (knapper nede til venstre, på samme linje som «full størrelse» som står til høyre): Topo (Kartverket topo), Flyfoto (Esri World Imagery; Kartverkets Norge-i-bilder-adresse virket ikke) og Bygninger (Kartverket gråtone + matrikkelens bygningslag). Valget huskes. Navn vises ved K-merkene og spisestedene når zoom ≥ 16.
 - Valget «Spisesteder» (av som standard): restauranter, kafeer og hurtigmat innen 1 km fra OpenStreetMap via Overpass (hedged mellom flere servere), vist som gaffel/kniv-markører innenfor valgt radius. Skjules hvis ingen treff eller hvis Overpass ikke svarer.
 - «Åpne eiendomskart» i Eiendom-kortet åpner et eget fullskjermkart (matrikkelkart med teiger og gnr/bnr-tall, info nede til venstre, «‹ Tilbake»). Åpnes alltid på 100 m, med de to andre radiusene (500 m, 1 km) som knapper.
