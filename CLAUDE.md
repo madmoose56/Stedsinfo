@@ -9,7 +9,7 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Filer (alt ligger i rota)
 - `index.html` – hele appen i én fil (HTML+CSS+JS, ingen byggesteg).
-- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v58).
+- `sw.js` – service worker, nettverk-først. **Øk `CACHE` (`stedsinfo-vN`) ved hver utgivelse** (nå: v59).
 - `manifest.webmanifest`, `icon-180.png`, `icon-512.png`, `README.md`.
 
 ## Plankart og reguleringsplan
@@ -29,6 +29,9 @@ Søsterapp til Ruteinfo (egen mappe: `C:\Users\stein\Desktop\Ruteinfo-opplasting
 
 ## Nummererte punkter på kartet
 - Avkrysninger for Holdeplasser (H1…), Arter (A1…), Naturtyper (N1…) og Friluftsliv (F1…), i tillegg til Kulturminner (K1…). Samme nummer står i kortene. Vises bare når laget har treff, er avkrysset og punktet ligger i det synlige kartutsnittet (med litt margin; ikke bare innenfor radiussirkelen, slik at 100 m-visningen også får med hjørnene); navn ved zoom ≥ 16. Arter: én markør per art ved nærmeste funn. Polygoner (natur/friluft) får punkt ved nærmeste hjørne, eller midten av omrisset hvis man står i dem.
+
+## «Kart»-knapp ved treff
+- Hvert treff i Kollektivtransport, Natur (verneområder, naturtyper, friluftsliv), Arter og Kulturminner har en liten «Kart»-knapp (klasse `kartbtn`, funksjon `kartTilTreff`): åpner fullskjermkartet sentrert på treffet med radius 100 m og en gul ring rundt treffet.
 
 ## Kart
 - Fullskjerm av nederste kart: starter på 100 m med radiusvalgene 100 m / 500 m / 1 km (som vanlig visning). Filtervalgene ligger i en meny som trekkes ut fra høyre side med håndtaket «Vis»; alle valg krysses av automatisk når fullskjermen åpnes (forrige avkrysning gjenopprettes ved «Tilbake»), og et trykk på kartet lukker menyen. Ved «‹ Tilbake» gjenopprettes forrige radius og utsnitt.
